@@ -1,4 +1,9 @@
-import { memo, useLayoutEffect, useState } from "react";
+import {
+  forwardRef,
+  useImperativeHandle,
+  useLayoutEffect,
+  useState,
+} from "react";
 import Taro from "@tarojs/taro";
 import { Textarea, Text, View, Image } from "@tarojs/components";
 import tim from "@/utils/tim";
@@ -29,8 +34,12 @@ type IMInputState = {
   title: string;
 };
 
-export default memo<Props>(
-  ({ conversation, sendMessage, showMessageErrorImage }) => {
+export type IMInputRef = {
+  onInputValueChange(e): void;
+};
+
+export default forwardRef<IMInputRef, Props>(
+  ({ conversation, sendMessage, showMessageErrorImage }, ref) => {
     const [data, setData] = useState<IMInputState>({
       isAudio: false,
       text: "按住说话",
@@ -44,6 +53,11 @@ export default memo<Props>(
       displayFlag: "",
       title: "",
     });
+
+    useImperativeHandle(ref, () => ({
+      onInputValueChange,
+    }));
+
     const recorderManager = Taro.getRecorderManager();
 
     const switchAudio = () => {

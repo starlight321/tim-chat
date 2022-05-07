@@ -1,12 +1,14 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { View, Text } from "@tarojs/components";
-import IMInput from "@/components/IMInput";
+import IMInput, { IMInputRef } from "@/components/IMInput";
+import IMMsgList from "@/components/IMMsgList";
 import Taro from "@tarojs/taro";
 import tim from "@/utils/tim";
 import "./index.scss";
 
 export default memo(() => {
   const [conversation, setConversation] = useState({});
+  const inputEl = useRef<IMInputRef>(null);
   useEffect(() => {
     const $instance = Taro.getCurrentInstance();
     const payloadData = JSON.parse(
@@ -27,10 +29,18 @@ export default memo(() => {
     //   message
     // );
   };
+
   return (
     <View>
       <Text>这是聊天页面</Text>
+      <IMMsgList
+        conversation={conversation}
+        inputSentMsg={(event) => {
+          inputEl.current?.onInputValueChange(event);
+        }}
+      />
       <IMInput
+        ref={inputEl}
         conversation={conversation}
         sendMessage={sendMessage}
         showMessageErrorImage={(val) => console.log("error>>>>>>", val)}

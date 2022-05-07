@@ -6,6 +6,7 @@ import sendImg from "@/assets/send-img.svg"
 import msgError from "@/assets/msg-error.png"
 import up from "@/assets/up.svg"
 import down from "@/assets/down.svg"
+import sendingAudio from "@/assets/sending-audio.png"
 
 export const pictures = {
     keyboard,
@@ -15,5 +16,6 @@ export const pictures = {
     sendImg,
     msgError,
     up,
-    down
+    down,
+    sendingAudio
 }
