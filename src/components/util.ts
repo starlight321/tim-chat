@@ -7,6 +7,7 @@ import msgError from "@/assets/msg-error.png"
 import up from "@/assets/up.svg"
 import down from "@/assets/down.svg"
 import sendingAudio from "@/assets/sending-audio.png"
+import star from "@/assets/star.png"
 
 export const pictures = {
     keyboard,
@@ -17,5 +18,6 @@ export const pictures = {
     msgError,
     up,
     down,
-    sendingAudio
+    sendingAudio,
+    star
 }

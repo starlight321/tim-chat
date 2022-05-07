@@ -18,6 +18,8 @@ import ImageMsg from "../ImageMsg";
 import AudioMsg from "../AudioMsg";
 import VideoMsg from "../VideoMsg";
 import FaceMsg from "../FaceMsg";
+import CustomMsg from "../CustomMsg";
+import SystemMsg from "../SystemMsg";
 
 type Props = {
   conversation: {
@@ -461,6 +463,11 @@ export default memo<Props>(({ conversation, inputSentMsg }) => {
     }
   };
 
+  // 删除处理掉的群通知消息
+  const changeSystemMessageList = (event) => {
+    updateMessageByID(event.detail.message.ID);
+  };
+
   return (
     <>
       <View className="container">
@@ -645,11 +652,9 @@ export default memo<Props>(({ conversation, inputSentMsg }) => {
                             <FaceMsg message="{{item}}" />
                           )}
 
-                          {/* <TUI-CustomMessage
-                            wx:if="{{item.type === 'TIMCustomElem'}}"
-                            message="{{item}}"
-                            isMine="{{item.isSelf}}"
-                          /> */}
+                          {item.type === "TIMCustomElem" && (
+                            <CustomMsg message={item} isMine={item.isSelf} />
+                          )}
                           {/* <TUI-FileMessage
                             wx:if="{{item.type === 'TIMFileElem'}}"
                             message="{{item}}"
@@ -677,7 +682,10 @@ export default memo<Props>(({ conversation, inputSentMsg }) => {
           {conversation.type === "@TIM#SYSTEM" &&
             data.messageList.map((item, index) => (
               <View className="t-message" key={index} data-value={item.ID}>
-                {/* <TUI-SystemMessage message="{{item}}" bind:changeSystemMessageList="changeSystemMessageList"></TUI-SystemMessage> */}
+                <SystemMsg
+                  message={item}
+                  onChangeSystemMessageList={changeSystemMessageList}
+                />
               </View>
             ))}
 
