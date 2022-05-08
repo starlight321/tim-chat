@@ -11,7 +11,7 @@ export default memo(() => {
       .login({
         userID: "123456",
         userSig:
-          "eJwtzFELgjAYheH-suuQb9NtJnQnBBVlFEXdyTbtMxziVhjRf2*ol*c58H7JeXeK3qYnGWERkMW4URvrscKRKYsTLubH6WfZdahJRhMAISkDOT0eWxNUcCoZiJhPaoYO**ACkhRgbmAdsg2-*LooD3tX3daKfvISrq-i2G98czfDwy*t2rYpV9apFfn9AXzEMTc_",
+          "eJyrVgrxCdYrSy1SslIy0jNQ0gHzM1NS80oy0zLBwoZGxiamZlCZ4pTsxIKCzBQlK0MTAwMzc0MjA3OITElmbipQ1MzU0BIIjKGiqRUFmUVAcTMDEwsDA6gZmelAY30yMiMDKyrdg0zNywuqkr0tM5IiAoKzgqIqg108gt21y-2MjCMcLfwLgkJtlWoBe0EwQw__",
       })
       .then(() => {
         console.log("登录成功");

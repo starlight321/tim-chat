@@ -19,5 +19,13 @@ export const pictures = {
     up,
     down,
     sendingAudio,
-    star
+    star,
+}
+
+
+export enum ImErrorCode {
+    DIRTY_WORDS_CODE = 80001,
+    UPLOAD_FAIL_CODE = 6008,
+    REQUEST_OVER_TIME_CODE = 2081,
+    DISCONNECT_NETWORK_CODE = 2800
 }

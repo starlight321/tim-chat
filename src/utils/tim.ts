@@ -121,4 +121,6 @@ tim.on(TIM.EVENT.FRIEND_GROUP_LIST_UPDATED, function (event) {
   // event.data - 存储 FriendGroup 对象的数组 - [FriendGroup]
 });
 
+tim.EVENT = TIM.EVENT;
+
 export default tim;

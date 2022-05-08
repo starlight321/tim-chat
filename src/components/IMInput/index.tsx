@@ -36,6 +36,7 @@ type IMInputState = {
 
 export type IMInputRef = {
   onInputValueChange(e): void;
+  handleClose(): void;
 };
 
 export default forwardRef<IMInputRef, Props>(
@@ -56,6 +57,9 @@ export default forwardRef<IMInputRef, Props>(
 
     useImperativeHandle(ref, () => ({
       onInputValueChange,
+      handleClose: () => {
+        setData((pre) => ({ ...pre, displayFlag: "" }));
+      },
     }));
 
     const recorderManager = Taro.getRecorderManager();
