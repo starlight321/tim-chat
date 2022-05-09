@@ -109,7 +109,7 @@ export default forwardRef<IMInputRef, Props>(
 
     const $sendTIMMessage = (message) => {
       // triggerEvent
-      sendMessage({ message });
+      sendMessage(message);
       tim
         .sendMessage(message, {
           offlinePushInfo: {
@@ -118,6 +118,7 @@ export default forwardRef<IMInputRef, Props>(
         })
         .then(() => {
           // 日志上报
+          console.log("发送成功");
         })
         .catch((error) => {
           console.log(error);

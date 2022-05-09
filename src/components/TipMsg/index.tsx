@@ -13,7 +13,7 @@ export default memo<Props>(({ message }) => {
   }, [message]);
 
   return (
-    <View className="tip-message">
+    <View className="im-tip-message">
       <View className="text-message">{textMessage}</View>
     </View>
   );

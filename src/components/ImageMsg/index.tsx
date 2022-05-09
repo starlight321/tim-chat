@@ -27,12 +27,13 @@ export default memo<Props>(({ message, isMine = true }) => {
       },
     });
   };
+
   return (
     <View className="im-image-message-wrap" onClick={previewImage}>
       <Image
         className={`image-message ${isMine ? "my-image" : ""}`}
         mode="aspectFill"
-        src="{{renderDom[0].src}}"
+        src={renderDom[0].src}
       />
       {showSave && (
         <Image

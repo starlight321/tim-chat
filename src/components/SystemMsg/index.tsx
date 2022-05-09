@@ -60,7 +60,7 @@ export default memo<Props>(({ message, onChangeSystemMessageList }) => {
   };
 
   return (
-    <View className="container">
+    <View className="im-system-msg container">
       {message.payload.operationType === 1 ? (
         <View className="card handle">
           <View>

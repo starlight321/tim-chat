@@ -6,7 +6,6 @@ import {
   Image,
   ITouchEvent,
   CommonEvent,
-  Block,
 } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import dayjs from "dayjs";
@@ -105,7 +104,6 @@ export default forwardRef<IMMsgListRef, Props>(
       showNewMessageCount: [],
       isLostsOfUnread: false,
       showUpJump: false,
-      UseData: "",
     });
 
     useEffect(() => {
@@ -276,33 +274,32 @@ export default forwardRef<IMMsgListRef, Props>(
       // app.globalData.groupOptionsNumber = this.data.messageList.slice(-1)[0].payload.operationType;
       setData((pre) => ({
         ...pre,
-        UseData: value,
         showNewMessageCount,
         showDownJump,
         messageList: [...messageList],
         groupOptionsNumber: messageList.slice(-1)[0].payload.operationType,
       }));
-      if (conversation.type === "GROUP") {
-        // this.triggerEvent("changeMemberCount", {
-        //   groupOptionsNumber: this.data.messageList.slice(-1)[0].payload.operationType,
-        // });
-      }
+      // if (conversation.type === "GROUP") {
+      // this.triggerEvent("changeMemberCount", {
+      //   groupOptionsNumber: this.data.messageList.slice(-1)[0].payload.operationType,
+      // });
+      // }
     };
 
     // 自己的消息上屏
     const updateMessageList = (message) => {
       console.log(data.messageList);
-      // messageTimeForShow(message);
-      // message.isSelf = true;
-      // data.messageList.push(message);
-      // setData((pre) => ({
-      //   ...pre,
-      //   lastMessageSequence: pre.messageList.slice(-1)[0].sequence,
-      //   messageList: [...pre.messageList],
-      //   jumpAim: filterSystemMessageID(
-      //     pre.messageList[pre.messageList.length - 1].ID
-      //   ),
-      // }));
+      messageTimeForShow(message);
+      message.isSelf = true;
+      data.messageList.push(message);
+      setData((pre) => ({
+        ...pre,
+        lastMessageSequence: pre.messageList.slice(-1)[0].sequence,
+        messageList: [...pre.messageList],
+        jumpAim: filterSystemMessageID(
+          pre.messageList[pre.messageList.length - 1].ID
+        ),
+      }));
     };
 
     // 兼容 scrollView
@@ -328,7 +325,7 @@ export default forwardRef<IMMsgListRef, Props>(
         } else {
           setData((pre) => ({
             ...pre,
-            messageList,
+            messageList: [...messageList],
             jumpAim: filterSystemMessageID(
               currentMessageList[currentMessageList.length - 1].ID
             ),
@@ -351,19 +348,18 @@ export default forwardRef<IMMsgListRef, Props>(
           .then((res) => {
             showMoreHistoryMessageTime(res.data.messageList);
             const { messageList, nextReqMessageID, isCompleted } = res.data; // 消息列表。
+            console.log(2222222222, messageList);
+            const newMessageList = [...messageList, ...data.messageList];
             setData((pre) => ({
               ...pre,
               nextReqMessageID, // 用于续拉，分页续拉时需传入该字段。
               isCompleted, // 表示是否已经拉完所有消息。
-              messageList: [...messageList, ...pre.messageList],
+              messageList: newMessageList,
             }));
-            if (
-              messageList.length > 0 &&
-              data.messageList.length < unreadCount
-            ) {
+            if (messageList.length > 0 && newMessageList.length < unreadCount) {
               getMessageList();
             }
-            $handleMessageRender(data.messageList, messageList);
+            $handleMessageRender(newMessageList, messageList);
           })
           .catch((error) => console.log(error));
       }
@@ -654,7 +650,7 @@ export default forwardRef<IMMsgListRef, Props>(
     };
 
     return (
-      <Block>
+      <View className="im-msg-list">
         <View className="container">
           <ScrollView
             className="message-list-container"
@@ -912,7 +908,7 @@ export default forwardRef<IMMsgListRef, Props>(
             </View>
           </View>
         )}
-      </Block>
+      </View>
     );
   }
 );

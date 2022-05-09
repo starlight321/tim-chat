@@ -100,7 +100,7 @@ export default memo(() => {
   };
 
   return (
-    <View className="container">
+    <View className="im-chat container">
       {/* <View className="tui-chatroom-navigatorbar"> */}
       {/* <Image
           className="tui-chatroom-navigatorbar-back"

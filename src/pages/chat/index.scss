@@ -1,61 +1,62 @@
-.container {
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-}
+.im-chat {
+  &.container {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
 
-.tui-chatroom-navigatorbar {
-  position: relative;
-  /*top: 0;*/
-  flex-shrink: 0;
-  width: 100%;
-  height: 176px;
-  background-color: #006eff;
-}
+  .tui-chatroom-navigatorbar {
+    position: relative;
+    /*top: 0;*/
+    flex-shrink: 0;
+    width: 750rpx;
+    height: 176rpx;
+    background-color: #006eff;
+  }
 
-.tui-chatroom-navigatorbar-back {
-  position: absolute;
-  width: 120px;
-  height: 120px;
-  left: 48px;
-  bottom: 30px;
-}
+  .tui-chatroom-navigatorbar-back {
+    position: absolute;
+    width: 60rpx;
+    height: 60rpx;
+    left: 24rpx;
+    bottom: 15rpx;
+  }
 
-.conversation-title {
-  position: absolute;
-  width: 350px;
-  height: 88px;
-  line-height: 56px;
-  font-size: 36px;
-  color: #ffffff;
-  z-index: 100;
-  bottom: 0;
-  left: 200px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+  .conversation-title {
+    position: absolute;
+    width: 350rpx;
+    height: 88rpx;
+    line-height: 56rpx;
+    font-size: 36rpx;
+    color: #ffffff;
+    z-index: 100;
+    bottom: 0;
+    left: 200rpx;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
 
-// ----------------------------------------------
-.message-list {
-  flex: 1;
-  width: 100vw;
-  overflow-y: scroll;
-}
+  .message-list {
+    flex: 1;
+    width: 100vw;
+    overflow-y: scroll;
+  }
 
-.message-input {
-  flex-shrink: 0;
-  width: 100%;
-}
-.calling {
-  position: fixed;
-  z-index: 199;
-  top: 0;
-  bottom: 0;
-  right: 0;
-}
-.group-profile {
-  top: 176px;
-  left: 0;
-  z-index: 8;
+  .message-input {
+    flex-shrink: 0;
+    width: 100%;
+  }
+  .calling {
+    position: fixed;
+    z-index: 199;
+    top: 0;
+    bottom: 0;
+    right: 0;
+  }
+  .group-profile {
+    top: 176rpx;
+    left: 0;
+    z-index: 8;
+  }
 }
