@@ -279,7 +279,7 @@ export default forwardRef<IMInputRef, Props>(
       }));
     };
 
-    const sendImageMessage = (type) => {
+    const sendImageMessage = (type: "camera" | "album") => {
       const maxSize = 20480000;
       Taro.chooseImage({
         sourceType: [type],
@@ -307,8 +307,39 @@ export default forwardRef<IMInputRef, Props>(
       });
     };
 
+    const sendVideoMessage = (type: "camera" | "album") => {
+      Taro.chooseVideo({
+        sourceType: [type], // 来源相册或者拍摄
+        maxDuration: 60, // 设置最长时间60s
+        camera: "back", // 后置摄像头
+        success: (res) => {
+          if (res) {
+            const message = tim.createVideoMessage({
+              to: getToAccount(),
+              conversationType: conversation.type,
+              payload: {
+                file: res,
+              },
+              onProgress: (percent) => {
+                message.percent = percent;
+              },
+            });
+            $sendTIMMessage(message);
+          }
+        },
+      });
+    };
+
     const handleSendImage = () => {
       sendImageMessage("album");
+    };
+
+    const handleSendPicture = () => {
+      sendImageMessage("camera");
+    };
+
+    const handleSendVideo = () => {
+      sendVideoMessage("album");
     };
 
     return (
@@ -371,9 +402,19 @@ export default forwardRef<IMInputRef, Props>(
 
           {data.displayFlag === "extension" && (
             <View className="im-Extensions">
+              <View className="im-Extension-slot" onClick={handleSendPicture}>
+                <Image className="im-Extension-icon" src={pictures.takePhoto} />
+                <View className="im-Extension-slot-name">拍摄照片</View>
+              </View>
+
               <View className="im-Extension-slot" onClick={handleSendImage}>
                 <Image className="im-Extension-icon" src={pictures.sendImg} />
                 <View className="im-Extension-slot-name">发送图片</View>
+              </View>
+
+              <View className="im-Extension-slot" onClick={handleSendVideo}>
+                <Image className="im-Extension-icon" src={pictures.sendVideo} />
+                <View className="im-Extension-slot-name">发送视频</View>
               </View>
             </View>
           )}

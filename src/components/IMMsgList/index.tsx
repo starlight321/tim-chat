@@ -1,4 +1,11 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ScrollView,
   View,
@@ -20,13 +27,17 @@ import VideoMsg from "../VideoMsg";
 import FaceMsg from "../FaceMsg";
 import CustomMsg from "../CustomMsg";
 import SystemMsg from "../SystemMsg";
+import PlayVideo, { ImCurrentVideoProps } from "../PlayVideo";
+import { parseSystemMsg } from "@/utils/message-facade";
+
+type ConversationType = {
+  conversationID?: string;
+  type?: "C2C" | "GROUP" | "@TIM#SYSTEM";
+};
 
 type Props = {
-  conversation: {
-    conversationID?: string;
-    type?: "C2C" | "GROUP" | "@TIM#SYSTEM";
-  };
-  inputSentMsg: (event) => void;
+  conversation: ConversationType;
+  inputSentMsg?: (event) => void;
   unreadCount: number;
 };
 
@@ -60,16 +71,17 @@ type IMMsgListState = {
   showUpJump: boolean;
 };
 
-const userID = "123456"; // 会从用户的信息中获取到
-
 export type IMMsgListRef = {
   sendMessageError(e): void;
   updateMessageList(e): void;
 };
 
 export default forwardRef<IMMsgListRef, Props>(
-  ({ conversation, inputSentMsg, unreadCount }, ref) => {
+  ({ conversation, unreadCount }, ref) => {
     const [msgOperateVisible, setMsgOperateVisible] = useState(false);
+    const dataRef = useRef<IMMsgListState & ConversationType>();
+    const videoContextRef = useRef<any>(null);
+    const [currentVideo, setCurrentVideo] = useState<ImCurrentVideoProps>({});
 
     useImperativeHandle(ref, () => ({
       sendMessageError,
@@ -89,7 +101,7 @@ export default forwardRef<IMMsgListRef, Props>(
       messageID: "",
       showMessageError: false,
       jumpAim: "",
-      triggered: true,
+      triggered: false,
       isRevoke: false,
       RevokeID: "",
       showName: "",
@@ -105,6 +117,10 @@ export default forwardRef<IMMsgListRef, Props>(
       isLostsOfUnread: false,
       showUpJump: false,
     });
+
+    useEffect(() => {
+      dataRef.current = { ...data, ...conversation };
+    }, [data, conversation]);
 
     useEffect(() => {
       if (conversation.conversationID) {
@@ -134,15 +150,15 @@ export default forwardRef<IMMsgListRef, Props>(
           userID: res.data.userID,
         }));
       });
-      tim.on(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived, this);
-      tim.on(tim.EVENT.MESSAGE_READ_BY_PEER, $onMessageReadByPeer, this);
-      tim.on(tim.EVENT.MESSAGE_REVOKED, $onMessageRevoked, this);
+      tim.on(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
       return () => {
         // 一定要解除相关的事件绑定
         tim.off(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
-        tim.off(tim.EVENT.MESSAGE_READ_BY_PEER, $onMessageReadByPeer);
-        tim.off(tim.EVENT.MESSAGE_REVOKED, $onMessageRevoked);
       };
+    }, []);
+
+    useLayoutEffect(() => {
+      videoContextRef.current = Taro.createVideoContext("im-play-video");
     }, []);
 
     // 拉取更多历史消息渲染时间
@@ -212,7 +228,8 @@ export default forwardRef<IMMsgListRef, Props>(
     const messageTimeForShow = (messageTime) => {
       const interval = 5 * 60 * 1000;
       const nowTime = Math.floor(messageTime.time / 10) * 10 * 1000;
-      const lastTime = data.messageList.slice(-1)[0].time * 1000;
+      const { messageList } = dataRef.current!;
+      const lastTime = messageList.slice(-1)[0].time * 1000;
       if (nowTime - lastTime > interval) {
         Object.assign(messageTime, {
           isShowTime: true,
@@ -226,36 +243,17 @@ export default forwardRef<IMMsgListRef, Props>(
       }
     };
 
-    // 消息已读更新
-    const $onMessageReadByPeer = () => {
-      setData((pre) => ({
-        ...pre,
-        messageList: [...pre.messageList],
-      }));
-    };
-
-    // 向对方通知消息撤回事件
-    const $onMessageRevoked = (event) => {
-      if (event.data[0].from !== userID) {
-        setData((pre) => ({
-          ...pre,
-          showName: event.data[0].nick,
-          RevokeID: event.data[0].ID,
-          isRevoke: true,
-        }));
-      }
-      updateMessageByID(event.data[0].ID);
-    };
-
     // 收到的消息
     const $onMessageReceived = (value) => {
+      console.log("收到的消息", value);
       messageTimeForShow(value.data[0]);
-      let { showNewMessageCount, showDownJump, messageList } = data;
+      let { showNewMessageCount, showDownJump, messageList, conversationID } =
+        dataRef.current!;
       value.data.forEach((item) => {
         if (
           messageList.length > 12 &&
           !value.data[0].isRead &&
-          item.conversationID === conversation.conversationID
+          item.conversationID === conversationID
         ) {
           showNewMessageCount.push(value.data[0]);
           showDownJump = true;
@@ -265,13 +263,20 @@ export default forwardRef<IMMsgListRef, Props>(
       });
       // 若需修改消息，需将内存的消息复制一份，不能直接更改消息，防止修复内存消息，导致其他消息监听处发生消息错误
       const list: any[] = [];
+      const lastCustomerService = [...messageList]
+        .reverse()
+        .find((item) => item.from !== dataRef.current?.userID);
       value.data.forEach((item) => {
-        if (item.conversationID === conversation.conversationID) {
+        if (item.conversationID === conversationID) {
           list.push(item);
+        } else if (
+          item.conversationID === "@TIM#SYSTEM" &&
+          lastCustomerService
+        ) {
+          list.push(parseSystemMsg(item, lastCustomerService));
         }
       });
       messageList = messageList.concat(list);
-      // app.globalData.groupOptionsNumber = this.data.messageList.slice(-1)[0].payload.operationType;
       setData((pre) => ({
         ...pre,
         showNewMessageCount,
@@ -279,16 +284,10 @@ export default forwardRef<IMMsgListRef, Props>(
         messageList: [...messageList],
         groupOptionsNumber: messageList.slice(-1)[0].payload.operationType,
       }));
-      // if (conversation.type === "GROUP") {
-      // this.triggerEvent("changeMemberCount", {
-      //   groupOptionsNumber: this.data.messageList.slice(-1)[0].payload.operationType,
-      // });
-      // }
     };
 
     // 自己的消息上屏
     const updateMessageList = (message) => {
-      console.log(data.messageList);
       messageTimeForShow(message);
       message.isSelf = true;
       data.messageList.push(message);
@@ -306,9 +305,9 @@ export default forwardRef<IMMsgListRef, Props>(
     const filterSystemMessageID = (messageID: string) => {
       const index = messageID.indexOf("@TIM#");
       if (index > -1) {
-        return messageID.replace("@TIM#", "");
+        return "msg-" + messageID.replace("@TIM#", "");
       }
-      return messageID;
+      return "msg-" + messageID;
     };
 
     // 历史消息渲染
@@ -355,8 +354,10 @@ export default forwardRef<IMMsgListRef, Props>(
               nextReqMessageID, // 用于续拉，分页续拉时需传入该字段。
               isCompleted, // 表示是否已经拉完所有消息。
               messageList: newMessageList,
+              triggered: false,
             }));
             if (messageList.length > 0 && newMessageList.length < unreadCount) {
+              console.log(33333333333);
               getMessageList();
             }
             $handleMessageRender(newMessageList, messageList);
@@ -367,21 +368,20 @@ export default forwardRef<IMMsgListRef, Props>(
 
     // 刷新消息列表
     const refresh = () => {
+      console.log("refresh");
+      if (data.triggered) return;
       if (data.isCompleted) {
         setData((pre) => ({
           ...pre,
-          isCompleted: true,
           triggered: false,
         }));
         return;
       }
+      setData((pre) => ({
+        ...pre,
+        triggered: true,
+      }));
       getMessageList();
-      setTimeout(() => {
-        setData((pre) => ({
-          ...pre,
-          triggered: false,
-        }));
-      }, 2000);
     };
 
     // 滑动到最底部置跳转事件为false
@@ -408,8 +408,8 @@ export default forwardRef<IMMsgListRef, Props>(
         ...pre,
         messageID: e.currentTarget.id,
         selectedMessage: data.messageList[index],
-        Show: true,
       }));
+      setMsgOperateVisible(true);
     };
 
     // 复制消息
@@ -430,7 +430,7 @@ export default forwardRef<IMMsgListRef, Props>(
 
     // 更新messagelist
     const updateMessageByID = (deleteMessageID: string) => {
-      const { messageList } = data;
+      const { messageList } = dataRef.current!;
       const deleteMessageArr = messageList.filter(
         (item) => item.ID === deleteMessageID
       );
@@ -439,60 +439,6 @@ export default forwardRef<IMMsgListRef, Props>(
         messageList,
       }));
       return deleteMessageArr;
-    };
-
-    // 删除消息
-    const deleteMessage = (e: ITouchEvent) => {
-      e.stopPropagation();
-      tim
-        .deleteMessage([data.selectedMessage])
-        .then((imResponse) => {
-          updateMessageByID(imResponse.data.messageList[0].ID);
-          Taro.showToast({
-            title: "删除成功!",
-            duration: 800,
-            icon: "none",
-          });
-        })
-        .catch(() => {
-          Taro.showToast({
-            title: "删除失败!",
-            duration: 800,
-            icon: "error",
-          });
-        });
-    };
-
-    // 撤回消息
-    const revokeMessage = () => {
-      tim
-        .revokeMessage(data.selectedMessage)
-        .then((imResponse) => {
-          setData((pre) => ({
-            ...pre,
-            resendMessage: imResponse.data.message,
-          }));
-          updateMessageByID(imResponse.data.message.ID);
-          if (imResponse.data.message.from === userID) {
-            setData((pre) => ({
-              ...pre,
-              showName: "你",
-              isRevoke: true,
-              isRewrite: true,
-            }));
-          }
-          // 消息撤回成功
-        })
-        .catch((imError) => {
-          Taro.showToast({
-            title: "超过2分钟消息不支持撤回",
-            duration: 800,
-            icon: "none",
-          });
-          setMsgOperateVisible(false);
-          // 消息撤回失败
-          console.warn("revokeMessage error:", imError);
-        });
     };
 
     // 消息发送失败
@@ -583,47 +529,23 @@ export default forwardRef<IMMsgListRef, Props>(
       });
     };
 
-    // 撤回消息重新发送
-    const resendMessage = () => {
-      tim
-        .resendMessage(data.resendMessage)
-        .then((imResponse) => {
-          // this.triggerEvent("resendMessage", {
-          //   message: imResponse.data.message,
-          // });
-          inputSentMsg({
-            detail: {
-              message: imResponse.data.message,
-            },
-          });
-          setData((pre) => ({
-            ...pre,
-            isRevoke: true,
-            isRewrite: false,
-          }));
-        })
-        .catch((imError) => {
-          Taro.showToast({
-            title: "重发失败",
-            icon: "none",
-          });
-          // logger.warn('resendMessage error', imError);
-        });
-    };
-
     // 消息跳转到最新
     const handleJumpNewMessage = () => {
-      setData((pre) => ({
-        ...pre,
-        jumpAim: filterSystemMessageID(
-          pre.messageList[pre.messageList.length - 1].ID
-        ),
-        showDownJump: false,
-        showNewMessageCount: [],
-      }));
+      console.log("消息跳转到最新");
+      setData((pre) => {
+        return {
+          ...pre,
+          jumpAim: filterSystemMessageID(
+            pre.messageList[pre.messageList.length - 1].ID
+          ),
+          showDownJump: false,
+          showNewMessageCount: [],
+        };
+      });
     };
     // 消息跳转到最近未读
     const handleJumpUnreadMessage = () => {
+      console.log("消息跳转到最近未读");
       getMessageList();
       if (unreadCount > 15) {
         setData((pre) => ({
@@ -649,6 +571,19 @@ export default forwardRef<IMMsgListRef, Props>(
       updateMessageByID(event.detail.message.ID);
     };
 
+    const openVideo = (val) => {
+      setCurrentVideo(val);
+      setTimeout(function () {
+        // 进入全屏状态
+        videoContextRef.current.requestFullScreen();
+        videoContextRef.current.play();
+      }, 400);
+    };
+
+    useEffect(() => {
+      console.log("triggered", data.triggered);
+    }, [data.triggered]);
+
     return (
       <View className="im-msg-list">
         <View className="container">
@@ -668,7 +603,7 @@ export default forwardRef<IMMsgListRef, Props>(
                 <View
                   className="t-message"
                   key={index}
-                  id={item.ID}
+                  id={`msg-${item.ID}`}
                   data-index={index}
                 >
                   {data.showMessageTime && (
@@ -720,11 +655,11 @@ export default forwardRef<IMMsgListRef, Props>(
                         >
                           {data.messageID === item.ID && (
                             <View
-                              className={`label-pop ${
+                              className={
                                 item.isSelf
                                   ? "label-self-body"
                                   : "label-recieve-body"
-                              }`}
+                              }
                             >
                               <View className="label-pop-mask">
                                 {(item.type === "TIMTextElem" ||
@@ -733,15 +668,15 @@ export default forwardRef<IMMsgListRef, Props>(
                                     className="copymessage"
                                     onClick={copyMessage}
                                   >
-                                    <Text>复制｜</Text>
+                                    <Text>复制</Text>
                                   </View>
                                 )}
 
-                                <View
+                                {/* <View
                                   className="deletemessage"
                                   onClick={deleteMessage}
                                 >
-                                  <Text>删除</Text>
+                                  <Text>｜删除</Text>
                                 </View>
 
                                 {item.isSelf && (
@@ -751,7 +686,7 @@ export default forwardRef<IMMsgListRef, Props>(
                                   >
                                     <Text>｜撤回</Text>
                                   </View>
-                                )}
+                                )} */}
                               </View>
                             </View>
                           )}
@@ -826,7 +761,11 @@ export default forwardRef<IMMsgListRef, Props>(
                             )}
 
                             {item.type === "TIMVideoFileElem" && (
-                              <VideoMsg message={item} isMine={item.isSelf} />
+                              <VideoMsg
+                                message={item}
+                                isMine={item.isSelf}
+                                openVideo={openVideo}
+                              />
                             )}
 
                             {item.type === "TIMFaceElem" && (
@@ -870,7 +809,7 @@ export default forwardRef<IMMsgListRef, Props>(
                 </View>
               ))}
 
-            {data.isRevoke && (
+            {/* {data.isRevoke && (
               <View>
                 <View className="notice" onClick={resendMessage}>
                   <View className="content">
@@ -883,9 +822,14 @@ export default forwardRef<IMMsgListRef, Props>(
                   </View>
                 </View>
               </View>
-            )}
+            )} */}
           </ScrollView>
         </View>
+
+        <PlayVideo
+          currentVideo={currentVideo}
+          resetCurrentVideo={() => setCurrentVideo({})}
+        />
 
         {data.showDownJump && (
           <View onClick={handleJumpNewMessage}>

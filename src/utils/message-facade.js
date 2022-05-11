@@ -198,3 +198,16 @@ export function parseAudio(message) {
   ];
   return renderDom;
 }
+
+// 将群通知转为客服消息
+export function parseSystemMsg(message, target) {
+  if (!message) return message;
+  return {
+    ...message,
+    conversationID: target.conversationID,
+    conversationType: target.conversationType,
+    from: target.from,
+    payload: { text: message.payload.userDefinedField },
+    type: "TIMTextElem",
+  };
+}

@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { View, Image, Text } from "@tarojs/components";
 import "./index.scss";
-import { pictures } from "./../util";
+import { pictures } from "../util";
 
 type Props = {
   message: any;

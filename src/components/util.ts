@@ -8,6 +8,9 @@ import up from "@/assets/up.svg"
 import down from "@/assets/down.svg"
 import sendingAudio from "@/assets/sending-audio.png"
 import star from "@/assets/star.png"
+import takePhoto from "@/assets/take-photo.svg"
+import sendVideo from "@/assets/send-video.svg"
+import play from "@/assets/play.svg"
 
 export const pictures = {
     keyboard,
@@ -20,6 +23,9 @@ export const pictures = {
     down,
     sendingAudio,
     star,
+    takePhoto,
+    sendVideo,
+    play
 }
 
 
