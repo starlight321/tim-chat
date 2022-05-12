@@ -12,7 +12,9 @@ const config = {
   sourceRoot: "src",
   outputRoot: "dist",
   plugins: [],
-  defineConstants: {},
+  defineConstants: {
+    LOCATION_APIKEY: JSON.stringify("VNIBZ-MXAYW-AB6RF-RXKAQ-CQI3H-D4BGC"),
+  },
   copy: {
     patterns: [],
     options: {},

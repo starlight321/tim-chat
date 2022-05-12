@@ -29,6 +29,7 @@ import CustomMsg from "../CustomMsg";
 import SystemMsg from "../SystemMsg";
 import PlayVideo, { ImCurrentVideoProps } from "../PlayVideo";
 import { parseSystemMsg } from "@/utils/message-facade";
+import LocationMsg from "../LocationMsg";
 
 type ConversationType = {
   conversationID?: string;
@@ -774,6 +775,10 @@ export default forwardRef<IMMsgListRef, Props>(
 
                             {item.type === "TIMCustomElem" && (
                               <CustomMsg message={item} isMine={item.isSelf} />
+                            )}
+
+                            {item.type === "TIMLocationElem" && (
+                              <LocationMsg message={item} />
                             )}
                             {/* <TUI-FileMessage
                             wx:if="{{item.type === 'TIMFileElem'}}"

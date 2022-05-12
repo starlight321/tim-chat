@@ -4,3 +4,8 @@
   align-items: center;
   box-sizing: border-box;
 }
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

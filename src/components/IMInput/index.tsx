@@ -1,7 +1,9 @@
 import {
   forwardRef,
+  useCallback,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useState,
 } from "react";
 import Taro from "@tarojs/taro";
@@ -93,7 +95,7 @@ export default forwardRef<IMInputRef, Props>(
       }
     };
 
-    const getToAccount = () => {
+    const toAccount = useMemo(() => {
       if (!conversation || !conversation.conversationID) {
         return "";
       }
@@ -105,10 +107,9 @@ export default forwardRef<IMInputRef, Props>(
         default:
           return conversation.conversationID;
       }
-    };
+    }, [conversation]);
 
     const $sendTIMMessage = (message) => {
-      // triggerEvent
       sendMessage(message);
       tim
         .sendMessage(message, {
@@ -132,10 +133,9 @@ export default forwardRef<IMInputRef, Props>(
     };
 
     const sendTextMessage = (msg: string, flag: boolean) => {
-      const to = getToAccount();
       const text = flag ? msg : data.message;
       const message = tim.createTextMessage({
-        to,
+        to: toAccount,
         conversationType: conversation.type,
         payload: {
           text,
@@ -162,7 +162,7 @@ export default forwardRef<IMInputRef, Props>(
           } else {
             // res.tempFilePath 存储录音文件的临时路径
             const message = tim.createAudioMessage({
-              to: getToAccount(),
+              to: toAccount,
               conversationType: conversation.type,
               payload: {
                 file: res,
@@ -181,7 +181,7 @@ export default forwardRef<IMInputRef, Props>(
           text: "按住说话",
         }));
       });
-    }, [getToAccount]);
+    }, [toAccount, conversation]);
 
     // 长按录音
     const handleLongPress = (e) => {
@@ -293,7 +293,7 @@ export default forwardRef<IMInputRef, Props>(
             return;
           }
           const message = tim.createImageMessage({
-            to: getToAccount(),
+            to: toAccount,
             conversationType: conversation.type,
             payload: {
               file: res,
@@ -315,7 +315,7 @@ export default forwardRef<IMInputRef, Props>(
         success: (res) => {
           if (res) {
             const message = tim.createVideoMessage({
-              to: getToAccount(),
+              to: toAccount,
               conversationType: conversation.type,
               payload: {
                 file: res,
@@ -340,6 +340,29 @@ export default forwardRef<IMInputRef, Props>(
 
     const handleSendVideo = () => {
       sendVideoMessage("album");
+    };
+
+    const handleSendLocation = () => {
+      Taro.chooseLocation({
+        success: function (res) {
+          const message = tim.createLocationMessage({
+            to: toAccount,
+            conversationType: conversation.type,
+            payload: {
+              description: JSON.stringify({
+                name: res.name,
+                address: res.address,
+              }),
+              longitude: res.longitude, // 经度
+              latitude: res.latitude, // 纬度
+            },
+          });
+          $sendTIMMessage(message);
+        },
+        fail: function (err) {
+          console.log(err);
+        },
+      });
     };
 
     return (
@@ -395,26 +418,31 @@ export default forwardRef<IMInputRef, Props>(
             </View>
           </View>
           {data.displayFlag === "emoji" && (
-            <View className="im-Emoji-area">
+            <View className="im-emoji-area">
               <IMEmoji onChange={appendMessage} />
             </View>
           )}
 
           {data.displayFlag === "extension" && (
-            <View className="im-Extensions">
-              <View className="im-Extension-slot" onClick={handleSendPicture}>
-                <Image className="im-Extension-icon" src={pictures.takePhoto} />
-                <View className="im-Extension-slot-name">拍摄照片</View>
+            <View className="im-extensions">
+              <View className="im-extension-slot" onClick={handleSendPicture}>
+                <Image className="im-extension-icon" src={pictures.takePhoto} />
+                <View className="im-extension-slot-name">拍摄照片</View>
               </View>
 
-              <View className="im-Extension-slot" onClick={handleSendImage}>
-                <Image className="im-Extension-icon" src={pictures.sendImg} />
-                <View className="im-Extension-slot-name">发送图片</View>
+              <View className="im-extension-slot" onClick={handleSendImage}>
+                <Image className="im-extension-icon" src={pictures.sendImg} />
+                <View className="im-extension-slot-name">发送图片</View>
               </View>
 
-              <View className="im-Extension-slot" onClick={handleSendVideo}>
-                <Image className="im-Extension-icon" src={pictures.sendVideo} />
-                <View className="im-Extension-slot-name">发送视频</View>
+              <View className="im-extension-slot" onClick={handleSendVideo}>
+                <Image className="im-extension-icon" src={pictures.sendVideo} />
+                <View className="im-extension-slot-name">发送视频</View>
+              </View>
+
+              <View className="im-extension-slot" onClick={handleSendLocation}>
+                <Image className="im-extension-icon" src={pictures.location} />
+                <View className="im-extension-slot-name">发送位置</View>
               </View>
             </View>
           )}

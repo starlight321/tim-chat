@@ -11,6 +11,8 @@ import star from "@/assets/star.png"
 import takePhoto from "@/assets/take-photo.svg"
 import sendVideo from "@/assets/send-video.svg"
 import play from "@/assets/play.svg"
+import location from "@/assets/location.svg"
+import mapMarker from "@/assets/map-marker.png"
 
 export const pictures = {
     keyboard,
@@ -25,7 +27,9 @@ export const pictures = {
     star,
     takePhoto,
     sendVideo,
-    play
+    play,
+    location,
+    mapMarker
 }
 
 
