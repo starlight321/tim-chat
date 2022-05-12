@@ -3,6 +3,7 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -30,6 +31,7 @@ import SystemMsg from "../SystemMsg";
 import PlayVideo, { ImCurrentVideoProps } from "../PlayVideo";
 import { parseSystemMsg } from "@/utils/message-facade";
 import LocationMsg from "../LocationMsg";
+import ImEvaluate from "../ImEvaluate";
 
 type ConversationType = {
   conversationID?: string;
@@ -58,13 +60,9 @@ type IMMsgListState = {
   showMessageError: boolean;
   jumpAim: string;
   triggered: boolean;
-  isRevoke: boolean;
-  RevokeID: string; // 撤回消息的ID用于处理对方消息展示界面
   showName: string;
-  isRewrite: boolean;
   nextReqMessageID: string; // 下一条消息标志
   selectedMessage: any;
-  deleteMessage: string;
   resendMessage: any;
   showDownJump: boolean;
   showNewMessageCount: any[];
@@ -83,6 +81,7 @@ export default forwardRef<IMMsgListRef, Props>(
     const dataRef = useRef<IMMsgListState & ConversationType>();
     const videoContextRef = useRef<any>(null);
     const [currentVideo, setCurrentVideo] = useState<ImCurrentVideoProps>({});
+    const [showEvaluate, setEvaluate] = useState(false);
 
     useImperativeHandle(ref, () => ({
       sendMessageError,
@@ -103,13 +102,9 @@ export default forwardRef<IMMsgListRef, Props>(
       showMessageError: false,
       jumpAim: "",
       triggered: false,
-      isRevoke: false,
-      RevokeID: "",
       showName: "",
-      isRewrite: false,
       nextReqMessageID: "",
       selectedMessage: {},
-      deleteMessage: "",
       errorMessage: {},
       errorMessageID: "",
       resendMessage: {},
@@ -128,6 +123,17 @@ export default forwardRef<IMMsgListRef, Props>(
         getMessageList();
       }
     }, [conversation]);
+
+    const lastWaiter = useMemo(() => {
+      const lastCustomerService = [...data.messageList]
+        .reverse()
+        .find((item) => item.from !== dataRef.current?.userID);
+      if (!lastCustomerService) return {};
+      return {
+        name: lastCustomerService.from,
+        avatar: lastCustomerService.avatar,
+      };
+    }, [data.messageList]);
 
     useEffect(() => {
       if (unreadCount > 12) {
@@ -153,7 +159,6 @@ export default forwardRef<IMMsgListRef, Props>(
       });
       tim.on(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
       return () => {
-        // 一定要解除相关的事件绑定
         tim.off(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
       };
     }, []);
@@ -672,22 +677,6 @@ export default forwardRef<IMMsgListRef, Props>(
                                     <Text>复制</Text>
                                   </View>
                                 )}
-
-                                {/* <View
-                                  className="deletemessage"
-                                  onClick={deleteMessage}
-                                >
-                                  <Text>｜删除</Text>
-                                </View>
-
-                                {item.isSelf && (
-                                  <View
-                                    className="revokemessage"
-                                    onClick={revokeMessage}
-                                  >
-                                    <Text>｜撤回</Text>
-                                  </View>
-                                )} */}
                               </View>
                             </View>
                           )}
@@ -780,11 +769,6 @@ export default forwardRef<IMMsgListRef, Props>(
                             {item.type === "TIMLocationElem" && (
                               <LocationMsg message={item} />
                             )}
-                            {/* <TUI-FileMessage
-                            wx:if="{{item.type === 'TIMFileElem'}}"
-                            message="{{item}}"
-                            isMine="{{item.isSelf}}"
-                          /> */}
                           </View>
                           {item.isSelf && (
                             <Image
@@ -803,7 +787,6 @@ export default forwardRef<IMMsgListRef, Props>(
                 </View>
               ))}
 
-            {/*filterSystemMessageID unknown  */}
             {conversation.type === "@TIM#SYSTEM" &&
               data.messageList.map((item, index) => (
                 <View className="t-message" key={index} data-value={item.ID}>
@@ -814,20 +797,7 @@ export default forwardRef<IMMsgListRef, Props>(
                 </View>
               ))}
 
-            {/* {data.isRevoke && (
-              <View>
-                <View className="notice" onClick={resendMessage}>
-                  <View className="content">
-                    <Text className="revoke">
-                      {data.showName}:撤回了一条消息
-                    </Text>
-                    {data.isRewrite && (
-                      <Text className="rewrite">重新编辑</Text>
-                    )}
-                  </View>
-                </View>
-              </View>
-            )} */}
+            {showEvaluate && <ImEvaluate lastWaiter={lastWaiter} />}
           </ScrollView>
         </View>
 

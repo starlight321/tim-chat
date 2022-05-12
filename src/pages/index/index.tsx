@@ -151,8 +151,8 @@ export default memo(() => {
       <Button
         type="primary"
         onClick={() => {
-          //  login();
-          setJumpAim(data.list[data.list.length - 1]);
+          login();
+          // setJumpAim(data.list[data.list.length - 1]);
         }}
       >
         登录

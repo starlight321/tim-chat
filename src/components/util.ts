@@ -7,6 +7,7 @@ import msgError from "@/assets/msg-error.png"
 import up from "@/assets/up.svg"
 import down from "@/assets/down.svg"
 import sendingAudio from "@/assets/sending-audio.png"
+import starGray from "@/assets/star-grey.png"
 import star from "@/assets/star.png"
 import takePhoto from "@/assets/take-photo.svg"
 import sendVideo from "@/assets/send-video.svg"
@@ -29,7 +30,8 @@ export const pictures = {
     sendVideo,
     play,
     location,
-    mapMarker
+    mapMarker,
+    starGray
 }
 
 

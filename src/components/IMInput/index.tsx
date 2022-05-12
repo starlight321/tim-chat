@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  useCallback,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
@@ -132,7 +131,7 @@ export default forwardRef<IMInputRef, Props>(
       setData((pre) => ({ ...pre, displayFlag: "" }));
     };
 
-    const sendTextMessage = (msg: string, flag: boolean) => {
+    const sendTextMessage = (msg?: string, flag?: boolean) => {
       const text = flag ? msg : data.message;
       const message = tim.createTextMessage({
         to: toAccount,
@@ -181,7 +180,7 @@ export default forwardRef<IMInputRef, Props>(
           text: "按住说话",
         }));
       });
-    }, [toAccount, conversation]);
+    }, [toAccount, conversation, data]);
 
     // 长按录音
     const handleLongPress = (e) => {
@@ -207,21 +206,17 @@ export default forwardRef<IMInputRef, Props>(
 
     // 录音时的手势上划移动距离对应文案变化
     const handleTouchMove = (e) => {
+      const diff =
+        data.startPoint.clientY - e.touches[e.touches.length - 1].clientY;
       if (data.isRecording) {
-        if (
-          data.startPoint.clientY - e.touches[e.touches.length - 1].clientY >
-          100
-        ) {
+        if (diff > 100) {
           setData((pre) => ({
             ...pre,
             text: "抬起停止",
             title: "松开手指，取消发送",
             canSend: false,
           }));
-        } else if (
-          data.startPoint.clientY - e.touches[e.touches.length - 1].clientY >
-          20
-        ) {
+        } else if (diff > 20) {
           setData((pre) => ({
             ...pre,
             text: "抬起停止",
@@ -383,10 +378,9 @@ export default forwardRef<IMInputRef, Props>(
                   value={data.message}
                   onInput={onInputValueChange}
                   maxlength={140}
-                  type="text"
                   autoHeight
                   placeholderClass="input-placeholder"
-                  onConfirm={sendTextMessage}
+                  onConfirm={() => sendTextMessage()}
                 />
               </View>
             ) : (
@@ -411,7 +405,10 @@ export default forwardRef<IMInputRef, Props>(
                   <Image className="im-icon" src={pictures.more} />
                 </View>
               ) : (
-                <View className="im-sendMessage-btn" onClick={sendTextMessage}>
+                <View
+                  className="im-sendMessage-btn"
+                  onClick={() => sendTextMessage()}
+                >
                   发送
                 </View>
               )}
