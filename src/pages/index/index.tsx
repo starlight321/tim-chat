@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from "react";
-import Taro from "@tarojs/taro";
+import Taro, { usePullDownRefresh } from "@tarojs/taro";
 import { View, Input, Button, ScrollView } from "@tarojs/components";
 import { genTestUserSig } from "@/utils/GenerateTestUserSig";
 import tim from "../../utils/tim";
@@ -12,39 +12,42 @@ for (let i = 120; i > 0; i--) {
 
 export default memo(() => {
   const [userID, setUserID] = useState("123456");
-  const [data, setData] = useState<any>({
-    list: [],
-    triggered: true,
-  });
+  const [triggered, setTriggered] = useState(false);
+  const [data, setData] = useState<any>([]);
   const [jumpAim, setJumpAim] = useState("");
 
   const fetchList = () => {
     if (!originData.length) {
-      setData((pre) => ({
-        ...pre,
-        triggered: false,
-      }));
+      setTimeout(() => {
+        setTriggered(false);
+      });
       return;
     }
     new Promise((resolve) => {
-      resolve(originData.splice(0, 30).reverse());
-    }).then((res: string[]) => {
-      setData((pre) => ({
-        list: [...res, ...pre.list],
-        triggered: false,
-      }));
-    });
+      setTimeout(() => {
+        resolve(originData.splice(0, 30).reverse());
+      }, 3000);
+    })
+      .then((res: string[]) => {
+        Taro.stopPullDownRefresh();
+        setData((pre) => [...res, ...pre]);
+      })
+      .finally(() => {
+        setTriggered(false);
+      });
   };
 
   const refresh = () => {
-    if (data.triggered) return;
-    setData((pre) => ({
-      ...pre,
-      triggered: true,
-    }));
+    if (triggered) return;
     console.log("refresh");
+    setTriggered(true);
     fetchList();
   };
+
+  usePullDownRefresh(() => {
+    console.log("onPullDownRefresh");
+    refresh();
+  });
 
   const scrollHandler = () => {
     console.log("scrollHandler");
@@ -132,7 +135,7 @@ export default memo(() => {
 
   useEffect(() => {
     login();
-    // fetchList();
+    fetchList();
     tim.on(tim.EVENT.SDK_READY, onSDKReady);
     return () => {
       tim.off(tim.EVENT.SDK_READY, onSDKReady);
@@ -140,40 +143,42 @@ export default memo(() => {
   }, []);
   return (
     <View className="home">
-      <Input
+      {/* <Input
         className="userInput"
         type="text"
         placeholder="请输入userID"
         focus
         value={userID}
         onInput={(e) => setUserID(e.detail.value)}
-      />
+      /> */}
+      <View className="list">
+        <ScrollView
+          className="container"
+          scrollY
+          scrollIntoView={jumpAim}
+          refresherEnabled
+          onRefresherRefresh={refresh}
+          refresherTriggered={triggered}
+          lower-lowerThreshold={200}
+          onScrollToLower={scrollHandler}
+        >
+          {data.map((i) => (
+            <View className="text" key={i} id={i}>
+              {i}
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
       <Button
         type="primary"
         onClick={() => {
-          login();
-          // setJumpAim(data.list[data.list.length - 1]);
+          // login();
+          setJumpAim(data[data.length - 1]);
         }}
       >
         登录
       </Button>
-
-      <ScrollView
-        className="container"
-        scrollY
-        scrollIntoView={jumpAim}
-        refresherEnabled
-        onRefresherRefresh={refresh}
-        refresherTriggered={data.triggered}
-        lower-lowerThreshold={200}
-        onScrollToLower={scrollHandler}
-      >
-        {data.list.map((i) => (
-          <View className="text" key={i} id={i}>
-            {i}
-          </View>
-        ))}
-      </ScrollView>
     </View>
   );
 });

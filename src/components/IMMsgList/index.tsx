@@ -59,7 +59,6 @@ type IMMsgListState = {
   errorMessageID: string;
   showMessageError: boolean;
   jumpAim: string;
-  triggered: boolean;
   showName: string;
   nextReqMessageID: string; // 下一条消息标志
   selectedMessage: any;
@@ -82,6 +81,7 @@ export default forwardRef<IMMsgListRef, Props>(
     const videoContextRef = useRef<any>(null);
     const [currentVideo, setCurrentVideo] = useState<ImCurrentVideoProps>({});
     const [showEvaluate, setEvaluate] = useState(false);
+    const [triggered, setTriggered] = useState(false);
 
     useImperativeHandle(ref, () => ({
       sendMessageError,
@@ -101,7 +101,6 @@ export default forwardRef<IMMsgListRef, Props>(
       messageID: "",
       showMessageError: false,
       jumpAim: "",
-      triggered: false,
       showName: "",
       nextReqMessageID: "",
       selectedMessage: {},
@@ -259,7 +258,7 @@ export default forwardRef<IMMsgListRef, Props>(
         if (
           messageList.length > 12 &&
           !value.data[0].isRead &&
-          item.conversationID === conversationID
+          [conversationID, "@TIM#SYSTEM"].includes(item.conversationID)
         ) {
           showNewMessageCount.push(value.data[0]);
           showDownJump = true;
@@ -355,12 +354,12 @@ export default forwardRef<IMMsgListRef, Props>(
             const { messageList, nextReqMessageID, isCompleted } = res.data; // 消息列表。
             console.log(2222222222, messageList);
             const newMessageList = [...messageList, ...data.messageList];
+            setTriggered(false);
             setData((pre) => ({
               ...pre,
               nextReqMessageID, // 用于续拉，分页续拉时需传入该字段。
               isCompleted, // 表示是否已经拉完所有消息。
               messageList: newMessageList,
-              triggered: false,
             }));
             if (messageList.length > 0 && newMessageList.length < unreadCount) {
               console.log(33333333333);
@@ -368,25 +367,28 @@ export default forwardRef<IMMsgListRef, Props>(
             }
             $handleMessageRender(newMessageList, messageList);
           })
-          .catch((error) => console.log(error));
+          .catch((error) => {
+            console.log(error);
+            setTriggered(false);
+          });
+      } else {
+        setTimeout(() => {
+          setTriggered(false);
+        }, 2000);
       }
     };
 
     // 刷新消息列表
     const refresh = () => {
       console.log("refresh");
-      if (data.triggered) return;
+      if (triggered) return;
+      setTriggered(true);
       if (data.isCompleted) {
-        setData((pre) => ({
-          ...pre,
-          triggered: false,
-        }));
+        setTimeout(() => {
+          setTriggered(false);
+        });
         return;
       }
-      setData((pre) => ({
-        ...pre,
-        triggered: true,
-      }));
       getMessageList();
     };
 
@@ -537,7 +539,10 @@ export default forwardRef<IMMsgListRef, Props>(
 
     // 消息跳转到最新
     const handleJumpNewMessage = () => {
-      console.log("消息跳转到最新");
+      console.log(
+        "消息跳转到最新",
+        data.messageList[data.messageList.length - 1]
+      );
       setData((pre) => {
         return {
           ...pre,
@@ -586,10 +591,6 @@ export default forwardRef<IMMsgListRef, Props>(
       }, 400);
     };
 
-    useEffect(() => {
-      console.log("triggered", data.triggered);
-    }, [data.triggered]);
-
     return (
       <View className="im-msg-list">
         <View className="container">
@@ -599,7 +600,7 @@ export default forwardRef<IMMsgListRef, Props>(
             scrollIntoView={data.jumpAim}
             refresherEnabled
             onRefresherRefresh={refresh}
-            refresherTriggered={data.triggered}
+            refresherTriggered={triggered}
             lower-lowerThreshold={200}
             onScrollToLower={scrollHandler}
           >
@@ -759,7 +760,7 @@ export default forwardRef<IMMsgListRef, Props>(
                             )}
 
                             {item.type === "TIMFaceElem" && (
-                              <FaceMsg message="{{item}}" />
+                              <FaceMsg message={item} />
                             )}
 
                             {item.type === "TIMCustomElem" && (
@@ -806,27 +807,27 @@ export default forwardRef<IMMsgListRef, Props>(
           resetCurrentVideo={() => setCurrentVideo({})}
         />
 
-        {data.showDownJump && (
-          <View onClick={handleJumpNewMessage}>
-            <View className="new-message-item">
-              <View className="new-message-box">
-                <Image className="icon-left" src={pictures.down} />
-                <Text>{data.showNewMessageCount.length}条新消息</Text>
-              </View>
-            </View>
+        <View
+          className="new-message-item"
+          style={{ visibility: data.showDownJump ? "visible" : "hidden" }}
+          onClick={handleJumpNewMessage}
+        >
+          <View className="new-message-box">
+            <Image className="icon-left" src={pictures.down} />
+            <Text>{data.showNewMessageCount.length}条新消息</Text>
           </View>
-        )}
+        </View>
 
-        {data.showUpJump && (
-          <View onClick={handleJumpUnreadMessage}>
-            <View className="unread-message-item">
-              <View className="unread-message-box">
-                <Image className="icon-left" src={pictures.up} />
-                <Text>{data.isLostsOfUnread ? "99+" : unreadCount}条未读</Text>
-              </View>
-            </View>
+        <View
+          className="unread-message-item"
+          style={{ visibility: data.showUpJump ? "visible" : "hidden" }}
+          onClick={handleJumpUnreadMessage}
+        >
+          <View className="unread-message-box">
+            <Image className="icon-left" src={pictures.up} />
+            <Text>{data.isLostsOfUnread ? "99+" : unreadCount}条未读</Text>
           </View>
-        )}
+        </View>
       </View>
     );
   }
