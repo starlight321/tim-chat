@@ -1,0 +1,16 @@
+.im-nav-message {
+  width: 80vw;
+  background: #fff;
+  padding: 20px 40px;
+  margin: 30px auto;
+  .category {
+    width: 100%;
+    line-height: 80px;
+    height: 80px;
+    border-bottom: 1px solid #ddd;
+    font-size: 28px;
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}

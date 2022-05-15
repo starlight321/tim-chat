@@ -1,0 +1,12 @@
+.im-customer-service-icon-wrap {
+  width: 80px;
+  height: 80px;
+  background: lightblue;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  .customer-service-icon {
+    width: 60px;
+    height: 60px;
+  }
+}

@@ -18,6 +18,15 @@ import {
 import Taro from "@tarojs/taro";
 import dayjs from "dayjs";
 import tim from "@/utils/tim";
+import { parseSystemMsg } from "@/utils/message-facade";
+import {
+  Conversation,
+  ImStatus,
+  fetchImCategory,
+  fetchQueuingProcess,
+  ImCategory,
+} from "@/services";
+import eventEmitter from "@/utils/eventEmitter";
 import { pictures, ImErrorCode } from "./../util";
 import "./index.scss";
 import TipMsg from "../TipMsg";
@@ -29,18 +38,15 @@ import FaceMsg from "../FaceMsg";
 import CustomMsg from "../CustomMsg";
 import SystemMsg from "../SystemMsg";
 import PlayVideo, { ImCurrentVideoProps } from "../PlayVideo";
-import { parseSystemMsg } from "@/utils/message-facade";
 import LocationMsg from "../LocationMsg";
 import ImEvaluate from "../ImEvaluate";
-
-type ConversationType = {
-  conversationID?: string;
-  type?: "C2C" | "GROUP" | "@TIM#SYSTEM";
-};
+import NavMsg from "../NavMsg";
+import WaitMsg from "../WaitMsg";
 
 type Props = {
-  conversation: ConversationType;
+  conversation: Conversation;
   inputSentMsg?: (event) => void;
+  changeConversation: (event) => void;
   unreadCount: number;
 };
 
@@ -74,14 +80,18 @@ export type IMMsgListRef = {
   updateMessageList(e): void;
 };
 
+const userID = "123456";
+let timer: any;
 export default forwardRef<IMMsgListRef, Props>(
   ({ conversation, unreadCount }, ref) => {
     const [msgOperateVisible, setMsgOperateVisible] = useState(false);
-    const dataRef = useRef<IMMsgListState & ConversationType>();
+    const dataRef = useRef<IMMsgListState & Conversation>();
     const videoContextRef = useRef<any>(null);
     const [currentVideo, setCurrentVideo] = useState<ImCurrentVideoProps>({});
     const [showEvaluate, setEvaluate] = useState(false);
     const [triggered, setTriggered] = useState(false);
+    const [categoryList, setCategoryList] = useState<ImCategory[]>([]);
+    const [waitData, setWaitData] = useState<any>();
 
     useImperativeHandle(ref, () => ({
       sendMessageError,
@@ -118,10 +128,51 @@ export default forwardRef<IMMsgListRef, Props>(
     }, [data, conversation]);
 
     useEffect(() => {
-      if (conversation.conversationID) {
+      if (typeof conversation.status !== "number") return;
+      if (conversation.status === ImStatus.CONNECT) {
         getMessageList();
+      } else if (conversation.status === ImStatus.WAIT) {
+        // 轮训排队
+        loopQueuingProcess();
+      } else {
+        // 获取分类
+        getImCategory();
       }
     }, [conversation]);
+
+    const loopQueuingProcess = async () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+      const res: any = await fetchQueuingProcess();
+      if (res.status === ImStatus.CONNECT) {
+        eventEmitter.emit("im_update_conversation", res);
+        clearTimeout(timer);
+        setWaitData(null);
+        return;
+      }
+      setWaitData(res);
+      timer = setTimeout(() => {
+        loopQueuingProcess();
+      }, 2000);
+    };
+
+    const getImCategory = async () => {
+      const res = await fetchImCategory();
+      setCategoryList(res);
+      setData((pre) => ({
+        ...pre,
+        messageList: [
+          ...pre.messageList,
+          {
+            type: "imCategory",
+            ID: String(dayjs().valueOf()),
+            time: dayjs().unix(),
+            payload: { list: res },
+          },
+        ],
+      }));
+    };
 
     const lastWaiter = useMemo(() => {
       const lastCustomerService = [...data.messageList]
@@ -134,7 +185,37 @@ export default forwardRef<IMMsgListRef, Props>(
       };
     }, [data.messageList]);
 
+    const addMsgEvent = (msgList) => {
+      const list = msgList.map((item) => {
+        let temp = {
+          ID: String(dayjs().valueOf()),
+          time: dayjs().unix(),
+          conversationType: "GROUP",
+          payload: item.payload,
+        };
+        if (item.type) {
+          return {
+            ...temp,
+            type: item.type,
+          };
+        }
+        return {
+          ...temp,
+          flow: "out",
+          from: userID,
+          type: "TIMTextElem",
+          isSelf: true,
+        };
+      });
+
+      setData((pre) => ({
+        ...pre,
+        messageList: [...pre.messageList, ...list],
+      }));
+    };
+
     useEffect(() => {
+      if (typeof conversation.status !== "number") return;
       if (unreadCount > 12) {
         if (unreadCount > 99) {
           setData((pre) => ({
@@ -157,10 +238,12 @@ export default forwardRef<IMMsgListRef, Props>(
         }));
       });
       tim.on(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
+      eventEmitter.on("im_update_msg_list", addMsgEvent);
       return () => {
         tim.off(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
+        eventEmitter.off("im_update_msg_list", addMsgEvent);
       };
-    }, []);
+    }, [conversation]);
 
     useLayoutEffect(() => {
       videoContextRef.current = Taro.createVideoContext("im-play-video");
@@ -648,6 +731,8 @@ export default forwardRef<IMMsgListRef, Props>(
                     </View>
                   )}
 
+                  {item.type === "imCategory" && <NavMsg message={item} />}
+
                   {!item.isDeleted && !item.isRevoked && (
                     <View
                       className="t-message-item"
@@ -688,7 +773,9 @@ export default forwardRef<IMMsgListRef, Props>(
                         <TipMsg message={item} />
                       )}
 
-                      {item.type !== "TIMGroupTipElem" && (
+                      {!["TIMGroupTipElem", "imCategory"].includes(
+                        item.type
+                      ) && (
                         <View
                           className={
                             item.isSelf ? "t-self-message" : "t-recieve-message"
@@ -799,6 +886,7 @@ export default forwardRef<IMMsgListRef, Props>(
               ))}
 
             {showEvaluate && <ImEvaluate lastWaiter={lastWaiter} />}
+            {waitData && <WaitMsg waitData={waitData} />}
           </ScrollView>
         </View>
 

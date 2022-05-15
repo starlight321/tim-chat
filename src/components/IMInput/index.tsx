@@ -8,16 +8,15 @@ import {
 import Taro from "@tarojs/taro";
 import { Textarea, Text, View, Image } from "@tarojs/components";
 import tim from "@/utils/tim";
+import { Conversation } from "@/services";
 import IMEmoji from "../IMEmoji";
 import { pictures } from "../util";
 import "./index.scss";
 
 type Props = {
-  conversation: {
-    conversationID?: string;
-    type?: "C2C" | "GROUP";
-  };
-  sendMessage: (event: any) => void;
+  conversation: Conversation;
+  toAccount: string;
+  updateMsgListHandle: (event: any) => void;
   showMessageErrorImage: ({ showErrorImageFlag: number, message: any }) => void;
 };
 
@@ -41,7 +40,10 @@ export type IMInputRef = {
 };
 
 export default forwardRef<IMInputRef, Props>(
-  ({ conversation, sendMessage, showMessageErrorImage }, ref) => {
+  (
+    { toAccount, conversation, updateMsgListHandle, showMessageErrorImage },
+    ref
+  ) => {
     const [data, setData] = useState<IMInputState>({
       isAudio: false,
       text: "按住说话",
@@ -94,22 +96,8 @@ export default forwardRef<IMInputRef, Props>(
       }
     };
 
-    const toAccount = useMemo(() => {
-      if (!conversation || !conversation.conversationID) {
-        return "";
-      }
-      switch (conversation.type) {
-        case "C2C":
-          return conversation.conversationID.replace("C2C", "");
-        case "GROUP":
-          return conversation.conversationID.replace("GROUP", "");
-        default:
-          return conversation.conversationID;
-      }
-    }, [conversation]);
-
     const $sendTIMMessage = (message) => {
-      sendMessage(message);
+      updateMsgListHandle(message);
       tim
         .sendMessage(message, {
           offlinePushInfo: {
@@ -133,6 +121,7 @@ export default forwardRef<IMInputRef, Props>(
 
     const sendTextMessage = (msg?: string, flag?: boolean) => {
       const text = flag ? msg : data.message;
+      console.log("conversation", conversation);
       const message = tim.createTextMessage({
         to: toAccount,
         conversationType: conversation.type,

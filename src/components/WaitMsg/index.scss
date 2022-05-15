@@ -1,0 +1,38 @@
+.im-wait-message {
+  width: 80vw;
+  background: #fff;
+  padding: 20px 40px;
+  margin: 30px auto;
+  .title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    .logo-wrap {
+      font-size: 36px;
+      display: flex;
+      align-items: center;
+      .logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        margin-right: 10px;
+      }
+    }
+    .status {
+      width: 200px;
+      height: 80px;
+      line-height: 80px;
+      font-size: 32px;
+      background: #eee;
+      border-radius: 40px;
+      text-align: center;
+    }
+  }
+  .content {
+    font-size: 26px;
+    color: #666;
+    .stress {
+      color: #4a4a4a;
+    }
+  }
+}
