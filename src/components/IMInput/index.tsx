@@ -1,23 +1,25 @@
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
-  useLayoutEffect,
-  useMemo,
+  useRef,
   useState,
 } from "react";
-import Taro from "@tarojs/taro";
+import Taro, { AuthSetting, useDidShow } from "@tarojs/taro";
 import { Textarea, Text, View, Image } from "@tarojs/components";
+import eventEmitter from "@/utils/eventEmitter";
 import tim from "@/utils/tim";
 import { Conversation } from "@/services";
+import { isAndroid } from "@/utils";
 import IMEmoji from "../IMEmoji";
-import { pictures } from "../util";
+import { ChooseImage, ChooseMedia, pictures } from "../util";
 import "./index.scss";
 
 type Props = {
   conversation: Conversation;
   toAccount: string;
   updateMsgListHandle: (event: any) => void;
-  showMessageErrorImage: ({ showErrorImageFlag: number, message: any }) => void;
+  handleJumpBottom: () => void;
 };
 
 type IMInputState = {
@@ -39,11 +41,11 @@ export type IMInputRef = {
   handleClose(): void;
 };
 
+let audioFlag: "start" | "end" | "onStart" | "onStop" | "onError" = "start";
+const androidPlatform = isAndroid();
+const recorderManager = Taro.getRecorderManager();
 export default forwardRef<IMInputRef, Props>(
-  (
-    { toAccount, conversation, updateMsgListHandle, showMessageErrorImage },
-    ref
-  ) => {
+  ({ toAccount, conversation, updateMsgListHandle, handleJumpBottom }, ref) => {
     const [data, setData] = useState<IMInputState>({
       isAudio: false,
       text: "按住说话",
@@ -57,6 +59,12 @@ export default forwardRef<IMInputRef, Props>(
       displayFlag: "",
       title: "",
     });
+    const dataRef = useRef<{
+      toAccount: string;
+      conversationType?: "C2C" | "GROUP" | "@TIM#SYSTEM";
+      canSend: boolean;
+    }>();
+    const [authSetting, setAuthSettings] = useState<AuthSetting>({});
 
     useImperativeHandle(ref, () => ({
       onInputValueChange,
@@ -65,13 +73,68 @@ export default forwardRef<IMInputRef, Props>(
       },
     }));
 
-    const recorderManager = Taro.getRecorderManager();
+    const getSetting = async () => {
+      const res = await Taro.getSetting();
+      setAuthSettings(res.authSetting);
+    };
+
+    useDidShow(() => {
+      getSetting();
+    });
+
+    useEffect(() => {
+      recorderManager.onStart(() => {
+        console.log("开始录音", audioFlag);
+        if (audioFlag === "end") recorderManager.stop();
+        audioFlag = "onStart";
+      });
+
+      recorderManager.onStop((res) => {
+        if (audioFlag === "start") return;
+        console.log("onStop", audioFlag);
+        audioFlag = "onStop";
+        if (dataRef.current?.canSend) {
+          if (res.duration < 1000) {
+            Taro.showToast({
+              title: "录音时间太短",
+              icon: "none",
+            });
+          } else {
+            // res.tempFilePath 存储录音文件的临时路径
+            const message = tim.createAudioMessage({
+              to: dataRef.current.toAccount,
+              conversationType: dataRef.current.conversationType,
+              payload: {
+                file: res,
+              },
+            });
+            sendTIMMessage(message);
+          }
+        }
+        setData((pre) => ({
+          ...pre,
+          startPoint: 0,
+          popupToggle: false,
+          isRecording: false,
+          canSend: true,
+          title: "",
+          text: "按住说话",
+        }));
+      });
+
+      recorderManager.onError((err) => {
+        console.log("录音错误", audioFlag, err);
+        audioFlag = "onError";
+        // recorderManager.stop();
+      });
+    }, []);
 
     const switchAudio = () => {
       setData((pre) => ({
         ...pre,
         isAudio: !pre.isAudio,
         text: "按住说话",
+        displayFlag: "",
       }));
     };
 
@@ -82,21 +145,16 @@ export default forwardRef<IMInputRef, Props>(
           message: event.detail.message.payload.text,
           sendMessageBtn: true,
         }));
-      } else if (event.detail.value) {
-        setData((pre) => ({
-          ...pre,
-          message: event.detail.value,
-          sendMessageBtn: true,
-        }));
       } else {
         setData((pre) => ({
           ...pre,
-          sendMessageBtn: false,
+          message: event.detail.value,
+          sendMessageBtn: event.detail.value ? true : false,
         }));
       }
     };
 
-    const $sendTIMMessage = (message) => {
+    const sendTIMMessage = (message) => {
       updateMsgListHandle(message);
       tim
         .sendMessage(message, {
@@ -107,13 +165,22 @@ export default forwardRef<IMInputRef, Props>(
         .then(() => {
           // 日志上报
           console.log("发送成功");
+          eventEmitter.emit("im_update_msg_status", {
+            message,
+            status: "success",
+          });
         })
         .catch((error) => {
-          console.log(error);
+          console.log("发送失败", error);
           // 日志上报
-          showMessageErrorImage({
-            showErrorImageFlag: error.code,
+          Taro.showToast({
+            title: error.message,
+            duration: 800,
+            icon: "none",
+          });
+          eventEmitter.emit("im_update_msg_status", {
             message,
+            status: "fail",
           });
         });
       setData((pre) => ({ ...pre, displayFlag: "" }));
@@ -121,7 +188,6 @@ export default forwardRef<IMInputRef, Props>(
 
     const sendTextMessage = (msg?: string, flag?: boolean) => {
       const text = flag ? msg : data.message;
-      console.log("conversation", conversation);
       const message = tim.createTextMessage({
         to: toAccount,
         conversationType: conversation.type,
@@ -135,46 +201,21 @@ export default forwardRef<IMInputRef, Props>(
         message: "",
         sendMessageBtn: false,
       }));
-      $sendTIMMessage(message);
+      sendTIMMessage(message);
     };
 
-    useLayoutEffect(() => {
-      recorderManager.onStop((res) => {
-        Taro.hideLoading();
-        if (data.canSend) {
-          if (res.duration < 1000) {
-            Taro.showToast({
-              title: "录音时间太短",
-              icon: "none",
-            });
-          } else {
-            // res.tempFilePath 存储录音文件的临时路径
-            const message = tim.createAudioMessage({
-              to: toAccount,
-              conversationType: conversation.type,
-              payload: {
-                file: res,
-              },
-            });
-            $sendTIMMessage(message);
-          }
-        }
-        setData((pre) => ({
-          ...pre,
-          startPoint: 0,
-          popupToggle: false,
-          isRecording: false,
-          canSend: true,
-          title: "",
-          text: "按住说话",
-        }));
-      });
-    }, [toAccount, conversation, data]);
+    useEffect(() => {
+      dataRef.current = {
+        toAccount,
+        conversationType: conversation.type,
+        canSend: data.canSend,
+      };
+    }, [toAccount, conversation.type, data.canSend]);
 
-    // 长按录音
-    const handleLongPress = (e) => {
+    const startRecorder = (e) => {
+      Taro.hideToast();
       recorderManager.start({
-        duration: 60000, // 录音的时长，单位 ms，最大值 600000（10 分钟）
+        duration: androidPlatform ? 6000 : 5000, // 录音的时长，单位 ms，最大值 600000（10 分钟）
         sampleRate: 44100, // 采样率
         numberOfChannels: 1, // 录音通道数
         encodeBitRate: 192000, // 编码码率
@@ -184,20 +225,47 @@ export default forwardRef<IMInputRef, Props>(
         ...pre,
         startPoint: e.touches[0],
         title: "正在录音",
-        // isRecording : true,
-        // canSend: true,
-        notShow: true,
-        isShow: false,
         isRecording: true,
         popupToggle: true,
       }));
     };
 
+    // 长按录音
+    const handleLongPress = (e) => {
+      console.log("handleLongPress", audioFlag);
+      audioFlag = "start";
+      eventEmitter.emit("im_update_audio_msg", {
+        isPlaying: false,
+      });
+      if (authSetting["scope.record"]) {
+        startRecorder(e);
+      } else {
+        Taro.authorize({
+          scope: "scope.record",
+          success: () => {
+            setAuthSettings((pre) => ({ ...pre, ["scope.record"]: true }));
+          },
+          fail: () => {
+            Taro.showModal({
+              title: "请求授权录音",
+              content: "需要获取您的录音权限，将拉起授权页",
+              success: async (res) => {
+                if (res.confirm) {
+                  Taro.openSetting({});
+                }
+              },
+            });
+          },
+        });
+      }
+    };
+
     // 录音时的手势上划移动距离对应文案变化
     const handleTouchMove = (e) => {
-      const diff =
-        data.startPoint.clientY - e.touches[e.touches.length - 1].clientY;
+      // console.log("handleTouchMove");
       if (data.isRecording) {
+        const diff =
+          data.startPoint.clientY - e.touches[e.touches.length - 1].clientY;
         if (diff > 100) {
           setData((pre) => ({
             ...pre,
@@ -224,33 +292,20 @@ export default forwardRef<IMInputRef, Props>(
     };
     // 手指离开页面滑动
     const handleTouchEnd = () => {
-      setData((pre) => ({
-        ...pre,
-        isRecording: false,
-        popupToggle: false,
-      }));
-      Taro.hideLoading();
-      recorderManager.stop();
-    };
-    // 选中表情消息
-    const handleEmoji = () => {
-      let targetFlag = "emoji";
-      if (data.displayFlag === "emoji") {
-        targetFlag = "";
+      console.log("handleTouchEnd", audioFlag);
+      if (audioFlag === "onStart") {
+        console.log("执行stop");
+        recorderManager.stop();
       }
-      setData((pre) => ({
-        ...pre,
-        displayFlag: targetFlag,
-      }));
+      audioFlag = "end";
     };
     // 选自定义消息
-    const handleExtensions = () => {
-      let targetFlag = "extension";
-      if (data.displayFlag === "extension") {
-        targetFlag = "";
-      }
+    const handleExtensions = (targetType: "emoji" | "extension") => {
+      const targetFlag = data.displayFlag !== targetType ? targetType : "";
       setData((pre) => ({
         ...pre,
+        isAudio: false,
+        text: "",
         displayFlag: targetFlag,
       }));
     };
@@ -263,19 +318,56 @@ export default forwardRef<IMInputRef, Props>(
       }));
     };
 
+    const handleChooseMedia = (
+      mediaType: ("image" | "video")[],
+      sourceType: ("album" | "camera")[]
+    ) => {
+      Taro.chooseMedia({
+        count: 1,
+        mediaType,
+        sourceType,
+        maxDuration: 30,
+        camera: "back",
+        success: (res) => {
+          let file: ChooseImage | ChooseMedia = res.tempFiles[0];
+          if (res.type === "image") {
+            const maxSize = 20480000;
+            if (res.tempFiles[0].size > maxSize) {
+              Taro.showToast({
+                title: "大于20M图片不支持发送",
+                icon: "none",
+              });
+              return;
+            }
+            file = {
+              tempFiles: [
+                {
+                  size: res.tempFiles[0].size,
+                  path: res.tempFiles[0].tempFilePath,
+                },
+              ],
+              tempFilePaths: [file.tempFilePath],
+            };
+          }
+          sendMediaMsg(res.type === "image" ? "Image" : "Video", file);
+        },
+      });
+    };
+
+    useEffect(() => {
+      if (data.displayFlag) {
+        Taro.nextTick(handleJumpBottom);
+      }
+    }, [data.displayFlag]);
+
     const sendImageMessage = (type: "camera" | "album") => {
       const maxSize = 20480000;
       Taro.chooseImage({
         sourceType: [type],
         count: 1,
         success: (res) => {
-          if (res.tempFiles[0].size > maxSize) {
-            Taro.showToast({
-              title: "大于20M图片不支持发送",
-              icon: "none",
-            });
-            return;
-          }
+          console.log(res);
+
           const message = tim.createImageMessage({
             to: toAccount,
             conversationType: conversation.type,
@@ -286,44 +378,35 @@ export default forwardRef<IMInputRef, Props>(
               message.percent = percent;
             },
           });
-          $sendTIMMessage(message);
+          sendTIMMessage(message);
         },
       });
     };
 
-    const sendVideoMessage = (type: "camera" | "album") => {
-      Taro.chooseVideo({
-        sourceType: [type], // 来源相册或者拍摄
-        maxDuration: 60, // 设置最长时间60s
-        camera: "back", // 后置摄像头
-        success: (res) => {
-          if (res) {
-            const message = tim.createVideoMessage({
-              to: toAccount,
-              conversationType: conversation.type,
-              payload: {
-                file: res,
-              },
-              onProgress: (percent) => {
-                message.percent = percent;
-              },
-            });
-            $sendTIMMessage(message);
-          }
+    const sendMediaMsg = (
+      type: "Image" | "Video",
+      file: ChooseImage | ChooseMedia
+    ) => {
+      console.log(type, file);
+
+      const message = tim[`create${type}Message`]({
+        to: toAccount,
+        conversationType: conversation.type,
+        payload: { file: file },
+        onProgress: (percent) => {
+          message.percent = percent;
         },
       });
+      sendTIMMessage(message);
     };
 
-    const handleSendImage = () => {
-      sendImageMessage("album");
+    const handleAlbum = () => {
+      // sendImageMessage("camera");
+      handleChooseMedia(["image", "video"], ["album"]);
     };
-
-    const handleSendPicture = () => {
-      sendImageMessage("camera");
-    };
-
-    const handleSendVideo = () => {
-      sendVideoMessage("album");
+    const handleCamera = () => {
+      // sendVideoMessage("album");
+      handleChooseMedia(["image"], ["camera"]);
     };
 
     const handleSendLocation = () => {
@@ -341,7 +424,7 @@ export default forwardRef<IMInputRef, Props>(
               latitude: res.latitude, // 纬度
             },
           });
-          $sendTIMMessage(message);
+          sendTIMMessage(message);
         },
         fail: function (err) {
           console.log(err);
@@ -363,6 +446,7 @@ export default forwardRef<IMInputRef, Props>(
                 <Textarea
                   className="im-message-input-area"
                   adjustPosition
+                  showConfirmBar={false}
                   cursorSpacing={20}
                   value={data.message}
                   onInput={onInputValueChange}
@@ -370,12 +454,14 @@ export default forwardRef<IMInputRef, Props>(
                   autoHeight
                   placeholderClass="input-placeholder"
                   onConfirm={() => sendTextMessage()}
+                  onFocus={handleJumpBottom}
                 />
               </View>
             ) : (
               <View
                 className="im-message-input-main im-message-input-main-text"
-                onLongPress={handleLongPress}
+                onTouchStart={handleLongPress}
+                // onLongPress={handleLongPress}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
               >
@@ -386,11 +472,11 @@ export default forwardRef<IMInputRef, Props>(
             <View className="im-message-input-functions" hover-className="none">
               <Image
                 className="im-icon"
-                onClick={handleEmoji}
+                onClick={() => handleExtensions("emoji")}
                 src={pictures.faceEmoji}
               />
               {!data.sendMessageBtn ? (
-                <View onClick={handleExtensions}>
+                <View onClick={() => handleExtensions("extension")}>
                   <Image className="im-icon" src={pictures.more} />
                 </View>
               ) : (
@@ -411,17 +497,20 @@ export default forwardRef<IMInputRef, Props>(
 
           {data.displayFlag === "extension" && (
             <View className="im-extensions">
-              <View className="im-extension-slot" onClick={handleSendPicture}>
+              <View className="im-extension-slot" onClick={handleCamera}>
                 <Image className="im-extension-icon" src={pictures.takePhoto} />
                 <View className="im-extension-slot-name">拍摄照片</View>
               </View>
 
-              <View className="im-extension-slot" onClick={handleSendImage}>
+              <View
+                className="im-extension-slot"
+                onClick={() => sendImageMessage("album")}
+              >
                 <Image className="im-extension-icon" src={pictures.sendImg} />
                 <View className="im-extension-slot-name">发送图片</View>
               </View>
 
-              <View className="im-extension-slot" onClick={handleSendVideo}>
+              <View className="im-extension-slot" onClick={handleAlbum}>
                 <Image className="im-extension-icon" src={pictures.sendVideo} />
                 <View className="im-extension-slot-name">发送视频</View>
               </View>
@@ -437,7 +526,7 @@ export default forwardRef<IMInputRef, Props>(
         {data.popupToggle && (
           <View
             className="record-modal"
-            onLongPress={handleLongPress}
+            onTouchStart={handleLongPress}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >

@@ -19,14 +19,18 @@
     justify-content: flex-end;
   }
   .image {
-    width: 16px;
-    height: 16px;
-    padding-left: 2px;
-    padding-right: 2px;
+    width: 32px;
+    height: 32px;
+    padding-left: 4px;
+    padding-right: 4px;
   }
   .my-image {
-    width: 16px;
-    height: 16px;
     transform: rotate(180deg);
+  }
+  .playing {
+    width: 32px;
+    height: 32px;
+    padding-left: 4px;
+    padding-right: 4px;
   }
 }

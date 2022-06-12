@@ -118,10 +118,6 @@ export default memo(() => {
     contentEl.current?.updateMessageList(message);
   };
 
-  const showMessageErrorImage = (event) => {
-    contentEl.current?.sendMessageError(event);
-  };
-
   const triggerClose = () => {
     inputEl.current?.handleClose();
   };
@@ -154,7 +150,7 @@ export default memo(() => {
           conversation={data.conversation}
           toAccount={toAccount}
           updateMsgListHandle={updateMsgListHandle}
-          showMessageErrorImage={showMessageErrorImage}
+          handleJumpBottom={contentEl.current?.handleJumpBottom!}
         />
       </View>
     </View>

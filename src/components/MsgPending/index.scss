@@ -1,0 +1,32 @@
+.msg-pending {
+  background: transparent;
+  border: 0 solid #8b8b8b;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+}
+
+@keyframes circleAnimation {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.circle {
+  background: transparent;
+  border-radius: 100%;
+  border: 4px solid;
+  border-color: inherit;
+  border-bottom-color: transparent;
+  animation: circleAnimation 0.75s 0s infinite linear;
+  animation-fill-mode: both;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+}

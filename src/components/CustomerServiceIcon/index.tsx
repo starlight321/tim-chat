@@ -29,7 +29,8 @@ export default memo<Props>(({ userID }) => {
   };
 
   const checkStatus = async () => {
-    const res = await fetchImStatus(userID, 0);
+    const res = await fetchImStatus(userID, 1);
+    console.log(res);
     login(JSON.stringify(res));
   };
 

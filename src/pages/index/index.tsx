@@ -3,11 +3,38 @@ import Taro from "@tarojs/taro";
 import { View, Input, Button } from "@tarojs/components";
 import { genTestUserSig } from "@/utils/GenerateTestUserSig";
 import CustomerServiceIcon from "@/components/CustomerServiceIcon";
+import MsgPending from "@/components/MsgPending";
+import update from "immutability-helper";
 import tim from "../../utils/tim";
 import "./index.scss";
 
+console.log("userSig", genTestUserSig("administrator").userSig);
+
+let arr1 = ["11", "22", "33", "44"];
+let arr2 = ["22", "44"];
+let arr3: string[] = [];
+arr2.forEach((k) => {
+  // if (arr1.some((v) => v === k)) {
+  //   console.log(k);
+  //   return;
+  // }
+  arr3.push(k);
+});
+console.log(arr3);
+
 export default memo(() => {
   const [userID, setUserID] = useState("123456");
+
+  const [list, setList] = useState([
+    {
+      name: "小名",
+      sex: 1,
+    },
+    {
+      name: "小红",
+      sex: 0,
+    },
+  ]);
 
   const scrollHandler = () => {
     console.log("scrollHandler");
@@ -100,6 +127,14 @@ export default memo(() => {
   //     tim.off(tim.EVENT.SDK_READY, onSDKReady);
   //   };
   // }, []);
+
+  const clickHandle = (idx: number) => {
+    setList((pre) =>
+      update(pre, {
+        [idx]: { sex: { $set: 0 } },
+      })
+    );
+  };
   return (
     <View className="home">
       {/* <Input
@@ -110,6 +145,17 @@ export default memo(() => {
         value={userID}
         onInput={(e) => setUserID(e.detail.value)}
       /> */}
+
+      {list.map((item, index) => (
+        <View key={index} onClick={() => clickHandle(index)}>
+          {item.name}
+          性别{item.sex}
+        </View>
+      ))}
+
+      {/* <View className="demo"> */}
+      <MsgPending />
+      {/* </View> */}
 
       <CustomerServiceIcon userID={userID} />
 

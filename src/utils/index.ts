@@ -1,3 +1,5 @@
+import Taro from "@tarojs/taro";
+
 export function calculateTimeAgo(dateTimeStamp) {
     const minute = 1000 * 60;      // 把分，时，天，周，半个月，一个月用毫秒表示
     const hour = minute * 60;
@@ -33,4 +35,18 @@ export function calculateTimeAgo(dateTimeStamp) {
         result = `${nYear}-${nMonth}-${nDate}`;
     }
     return result;
+}
+
+// 获取平台信息
+const getSystemInfoPlatform = () => {
+    try {
+        const res = Taro.getSystemInfoSync() // 读取设备所有信息
+        return res.platform;
+    } catch (error) {
+        console.log(error)
+    }
+};
+
+export const isAndroid = () => {
+    return getSystemInfoPlatform() === "android"
 }

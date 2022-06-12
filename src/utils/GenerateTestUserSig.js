@@ -4,6 +4,9 @@ import LibGenerateTestUserSig from "./lib-generate-test-usersig-es.min.js";
 const _SDKAPPID = 1400671207;
 const _SECRETKEY =
   "ac3d4e1373f9b397f834545475c672fe784bb96a5b3e831ec0eaf2f6d65f1866";
+// const _SDKAPPID = 1400667134;
+// const _SECRETKEY =
+//   "630ab71e1474db90640facc3c97bf19356fccaee95effd5e69556b9c73c18c90";
 /*
  * Module:   GenerateTestUserSig
  *

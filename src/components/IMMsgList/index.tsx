@@ -26,6 +26,7 @@ import {
   fetchQueuingProcess,
   ImCategory,
 } from "@/services";
+import update from "immutability-helper";
 import eventEmitter from "@/utils/eventEmitter";
 import { pictures, ImErrorCode } from "./../util";
 import "./index.scss";
@@ -42,6 +43,8 @@ import LocationMsg from "../LocationMsg";
 import ImEvaluate from "../ImEvaluate";
 import NavMsg from "../NavMsg";
 import WaitMsg from "../WaitMsg";
+import MsgPending from "../MsgPending";
+import FileMsg from "../FileMsg";
 
 type Props = {
   conversation: Conversation;
@@ -76,12 +79,13 @@ type IMMsgListState = {
 };
 
 export type IMMsgListRef = {
-  sendMessageError(e): void;
   updateMessageList(e): void;
+  handleJumpBottom(): void;
 };
 
 const userID = "123456";
 let timer: any;
+
 export default forwardRef<IMMsgListRef, Props>(
   ({ conversation, unreadCount }, ref) => {
     const [msgOperateVisible, setMsgOperateVisible] = useState(false);
@@ -90,12 +94,19 @@ export default forwardRef<IMMsgListRef, Props>(
     const [currentVideo, setCurrentVideo] = useState<ImCurrentVideoProps>({});
     const [showEvaluate, setEvaluate] = useState(false);
     const [triggered, setTriggered] = useState(false);
-    const [categoryList, setCategoryList] = useState<ImCategory[]>([]);
     const [waitData, setWaitData] = useState<any>();
+    const audioRef = useRef<Taro.InnerAudioContext>();
 
     useImperativeHandle(ref, () => ({
-      sendMessageError,
       updateMessageList,
+      handleJumpBottom: () => {
+        setData((pre) => {
+          return {
+            ...pre,
+            jumpAim: "im-msg-list-bottom",
+          };
+        });
+      },
     }));
 
     const [data, setData] = useState<IMMsgListState>({
@@ -128,6 +139,7 @@ export default forwardRef<IMMsgListRef, Props>(
     }, [data, conversation]);
 
     useEffect(() => {
+      console.log("conversation", conversation);
       if (typeof conversation.status !== "number") return;
       if (conversation.status === ImStatus.CONNECT) {
         getMessageList();
@@ -159,7 +171,6 @@ export default forwardRef<IMMsgListRef, Props>(
 
     const getImCategory = async () => {
       const res = await fetchImCategory();
-      setCategoryList(res);
       setData((pre) => ({
         ...pre,
         messageList: [
@@ -237,10 +248,10 @@ export default forwardRef<IMMsgListRef, Props>(
           userID: res.data.userID,
         }));
       });
-      tim.on(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
+      tim.on(tim.EVENT.MESSAGE_RECEIVED, onMessageReceived);
       eventEmitter.on("im_update_msg_list", addMsgEvent);
       return () => {
-        tim.off(tim.EVENT.MESSAGE_RECEIVED, $onMessageReceived);
+        tim.off(tim.EVENT.MESSAGE_RECEIVED, onMessageReceived);
         eventEmitter.off("im_update_msg_list", addMsgEvent);
       };
     }, [conversation]);
@@ -249,8 +260,60 @@ export default forwardRef<IMMsgListRef, Props>(
       videoContextRef.current = Taro.createVideoContext("im-play-video");
     }, []);
 
+    const updateMsgStatus = (event) => {
+      setData((pre) => {
+        const idx =
+          typeof event.index === "number"
+            ? event.index
+            : pre.messageList.findIndex((item) => item.ID === event.message.ID);
+        const messageList =
+          idx > -1
+            ? update(pre.messageList, {
+                [idx]: { status: { $set: event.status } },
+              })
+            : pre.messageList;
+        return {
+          ...pre,
+          messageList,
+        };
+      });
+    };
+
+    const updateAudioMsg = (event) => {
+      const list = dataRef.current?.messageList || [];
+      list.forEach((item) => {
+        if (item.type === "TIMSoundElem") item.isPlaying = false;
+      });
+      if (!event.isPlaying && audioRef.current) {
+        audioRef.current.destroy();
+      }
+
+      if (typeof event.index === "number" && list[event.index]) {
+        list[event.index].isPlaying = event.isPlaying;
+        console.log(event.index, event.isPlaying);
+        console.log(list);
+      }
+
+      setData((pre) => {
+        return {
+          ...pre,
+          messageList: [...list],
+        };
+      });
+    };
+
+    useEffect(() => {
+      eventEmitter.on("im_update_msg_status", updateMsgStatus);
+      eventEmitter.on("im_update_audio_msg", updateAudioMsg);
+      return () => {
+        eventEmitter.off("im_update_msg_status", updateMsgStatus);
+        eventEmitter.off("im_update_audio_msg", updateAudioMsg);
+      };
+    }, []);
+
     // 拉取更多历史消息渲染时间
     const showMoreHistoryMessageTime = (messageList) => {
+      if (!messageList.length) return;
       const showHistoryTime = messageList[0].time * 1000;
       Object.assign(messageList[0], {
         isShowMoreHistoryTime: true,
@@ -273,9 +336,7 @@ export default forwardRef<IMMsgListRef, Props>(
         const nowDayTime = Math.floor(messageList[index].time / 10) * 10 * 1000;
         const firstTime = messageList[0].time * 1000;
         if (nowDayTime - firstTime > cut) {
-          const indexButton = messageList
-            .map((item) => item)
-            .indexOf(messageList[index]); // 获取第一个时间大于30分钟的消息所在位置的下标
+          const indexButton = messageList.indexOf(messageList[index]); // 获取第一个时间大于30分钟的消息所在位置的下标
           const showHistoryTime =
             Math.floor(messageList[indexButton].time / 10) * 10 * 1000;
           Object.assign(messageList[indexButton], {
@@ -313,13 +374,13 @@ export default forwardRef<IMMsgListRef, Props>(
     };
 
     // 展示消息时间
-    const messageTimeForShow = (messageTime) => {
+    const messageTimeForShow = (message) => {
       const interval = 5 * 60 * 1000;
-      const nowTime = Math.floor(messageTime.time / 10) * 10 * 1000;
+      const nowTime = Math.floor(message.time / 10) * 10 * 1000;
       const { messageList } = dataRef.current!;
       const lastTime = messageList.slice(-1)[0].time * 1000;
       if (nowTime - lastTime > interval) {
-        Object.assign(messageTime, {
+        Object.assign(message, {
           isShowTime: true,
         });
         // data.messageTime = dayjs(nowTime);
@@ -332,7 +393,7 @@ export default forwardRef<IMMsgListRef, Props>(
     };
 
     // 收到的消息
-    const $onMessageReceived = (value) => {
+    const onMessageReceived = (value) => {
       console.log("收到的消息", value);
       messageTimeForShow(value.data[0]);
       let { showNewMessageCount, showDownJump, messageList, conversationID } =
@@ -370,7 +431,6 @@ export default forwardRef<IMMsgListRef, Props>(
         showNewMessageCount,
         showDownJump,
         messageList: [...messageList],
-        groupOptionsNumber: messageList.slice(-1)[0].payload.operationType,
       }));
     };
 
@@ -532,88 +592,62 @@ export default forwardRef<IMMsgListRef, Props>(
       return deleteMessageArr;
     };
 
-    // 消息发送失败
-    const sendMessageError = (event) => {
-      let showMessageError = data.showMessageError;
-      if (event.detail.showErrorImageFlag === ImErrorCode.DIRTY_WORDS_CODE) {
-        showMessageError = true;
-        Taro.showToast({
-          title: "您发送的消息包含违禁词汇!",
-          duration: 800,
-          icon: "none",
-        });
-      } else if (
-        event.detail.showErrorImageFlag === ImErrorCode.UPLOAD_FAIL_CODE
-      ) {
-        showMessageError = true;
-        Taro.showToast({
-          title: "文件上传失败!",
-          duration: 800,
-          icon: "none",
-        });
-      } else if (
-        event.detail.showErrorImageFlag ===
-        (ImErrorCode.REQUEST_OVER_TIME_CODE ||
-          ImErrorCode.DISCONNECT_NETWORK_CODE)
-      ) {
-        showMessageError = true;
-        Taro.showToast({
-          title: "网络已断开!",
-          duration: 800,
-          icon: "none",
-        });
-      }
-      setData((pre) => ({
-        ...pre,
-        showMessageError,
-        errorMessage: event.detail.message,
-        errorMessageID: event.detail.message.ID,
-      }));
-    };
-
     // 消息发送失败后重新发送
-    const ResndMessage = () => {
+    const ResndMessage = (item, index) => {
       Taro.showModal({
         content: "确认重发该消息？",
         success: (res) => {
-          if (res.confirm) {
+          if (res.confirm && item.status === "fail") {
+            eventEmitter.emit("im_update_msg_status", {
+              message: item,
+              status: "unSend",
+              index,
+            });
             tim
-              .resendMessage(data.errorMessage) // 传入需要重发的消息实例
+              .resendMessage(item) // 传入需要重发的消息实例
               .then(() => {
+                eventEmitter.emit("im_update_msg_status", {
+                  message: item,
+                  status: "success",
+                  index,
+                });
                 Taro.showToast({
                   title: "重发成功!",
                   duration: 800,
                   icon: "none",
                 });
-                setData((pre) => ({
-                  ...pre,
-                  showMessageError: false,
-                }));
               })
               .catch((imError) => {
-                if (imError.code === ImErrorCode.DIRTY_WORDS_CODE) {
-                  Taro.showToast({
-                    title: "您发送的消息包含违禁词汇!",
-                    duration: 800,
-                    icon: "none",
-                  });
-                } else if (imError.code === ImErrorCode.UPLOAD_FAIL_CODE) {
-                  Taro.showToast({
-                    title: "文件上传失败!",
-                    duration: 800,
-                    icon: "none",
-                  });
-                } else if (
-                  imError.code ===
-                  (ImErrorCode.REQUEST_OVER_TIME_CODE ||
-                    ImErrorCode.DISCONNECT_NETWORK_CODE)
-                ) {
-                  Taro.showToast({
-                    title: "网络已断开!",
-                    duration: 800,
-                    icon: "none",
-                  });
-                }
+                console.log("重发失败");
+                eventEmitter.emit("im_update_msg_status", {
+                  message: item,
+                  status: "fail",
+                  index,
+                });
+                // if (imError.code === ImErrorCode.DIRTY_WORDS_CODE) {
+                //   Taro.showToast({
+                //     title: "您发送的消息包含违禁词汇!",
+                //     duration: 800,
+                //     icon: "none",
+                //   });
+                // } else if (imError.code === ImErrorCode.UPLOAD_FAIL_CODE) {
+                //   Taro.showToast({
+                //     title: "文件上传失败!",
+                //     duration: 800,
+                //     icon: "none",
+                //   });
+                // } else if (
+                //   [
+                //     ImErrorCode.REQUEST_OVER_TIME_CODE,
+                //     ImErrorCode.DISCONNECT_NETWORK_CODE,
+                //   ].includes(imError.code)
+                // ) {
+                //   Taro.showToast({
+                //     title: "网络已断开!",
+                //     duration: 800,
+                //     icon: "none",
+                //   });
+                // }
               });
           }
         },
@@ -797,16 +831,19 @@ export default forwardRef<IMMsgListRef, Props>(
                             </View>
                           )}
 
-                          {((item.isSelf && item.ID === data.errorMessageID) ||
-                            item.status === "fail") && (
+                          {item.status === "fail" && (
                             <View className="t-message-error-box">
-                              {data.showMessageError && (
-                                <Image
-                                  className="t-message-error"
-                                  src={pictures.msgError}
-                                  onClick={ResndMessage}
-                                />
-                              )}
+                              <Image
+                                className="t-message-error"
+                                src={pictures.msgError}
+                                onClick={() => ResndMessage(item, index)}
+                              />
+                            </View>
+                          )}
+
+                          {item.status === "unSend" && (
+                            <View className="t-message-error-box">
+                              <MsgPending />
                             </View>
                           )}
 
@@ -833,8 +870,8 @@ export default forwardRef<IMMsgListRef, Props>(
                               <AudioMsg
                                 message={item}
                                 isMine={item.isSelf}
-                                data-index={index}
-                                messageList={data.messageList}
+                                currentIndex={index}
+                                audioRef={audioRef}
                               />
                             )}
 
@@ -857,10 +894,15 @@ export default forwardRef<IMMsgListRef, Props>(
                             {item.type === "TIMLocationElem" && (
                               <LocationMsg message={item} />
                             )}
+
+                            {item.type === "TIMFileElem" && (
+                              <FileMsg message={item} />
+                            )}
                           </View>
                           {item.isSelf && (
                             <Image
                               className="t-message-avatar"
+                              onClick={() => console.log(item)}
                               src={
                                 item.avatar ||
                                 "https://sdk-web-1252463788.cos.ap-hongkong.myqcloud.com/component/TUIKit/assets/avatar_21.png"
@@ -887,6 +929,8 @@ export default forwardRef<IMMsgListRef, Props>(
 
             {showEvaluate && <ImEvaluate lastWaiter={lastWaiter} />}
             {waitData && <WaitMsg waitData={waitData} />}
+
+            <View id="im-msg-list-bottom"></View>
           </ScrollView>
         </View>
 

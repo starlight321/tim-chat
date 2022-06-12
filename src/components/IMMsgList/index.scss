@@ -244,13 +244,11 @@
     color: #333333;
   }
   .t-message-error-box {
-    display: flex;
-    align-items: center;
-    padding-right: 6px;
+    padding: 24px 24px 0 0;
   }
   .t-message-error {
-    width: 16px;
-    height: 16px;
+    width: 32px;
+    height: 32px;
   }
   .showmessagetime {
     display: flex;
